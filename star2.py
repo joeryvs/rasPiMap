@@ -1,6 +1,6 @@
 import turtle
 import random
-import itertools
+
 
 def r_color():
     return (random.random(), random.random(), random.random())
@@ -15,7 +15,7 @@ def setup():
     pass
 
 
-def action(points:int):
+def action(points: int):
     angle = (180*(points-2))/points
     turtle.begin_fill()
     for a in range(points*2):
