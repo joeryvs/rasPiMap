@@ -1,27 +1,10 @@
 import turtledemo
 import random
-from turtledemo import rosette
-from turtledemo import bytedesign
-from turtledemo import chaos
-from turtledemo import clock
-from turtledemo import colormixer
-from turtledemo import forest
-from turtledemo import fractalcurves
-from turtledemo import lindenmayer
-from turtledemo import paint
-from turtledemo import minimal_hanoi
-from turtledemo import nim
-from turtledemo import peace
-from turtledemo import penrose
-from turtledemo import planet_and_moon
-from turtledemo import tree
-from turtledemo import round_dance
-from turtledemo import sorting_animate
-from turtledemo import two_canvases
-from turtledemo import yinyang
-from turtledemo import __main__
+from turtledemo import rosette, bytedesign, chaos, clock, colormixer, forest, fractalcurves,\
+    lindenmayer, minimal_hanoi, nim, paint, peace, penrose, planet_and_moon,\
+    round_dance, sorting_animate,    tree, two_canvases, yinyang, __main__
 
-functionss : list[function] = [
+functionss = [
     rosette,
     bytedesign,
     clock,
@@ -46,11 +29,12 @@ functionss : list[function] = [
 ]
 
 
-
 def main():
     g = random.choice(functionss)
+    print(g)
     g.main()
     g.mainloop()
+    
     pass
 
 
