@@ -1,8 +1,7 @@
-import cgi
-import pathlib
-from traceback import print_tb
+import pprint
 import turtledemo
 import random
+import json
 from turtledemo import rosette, bytedesign, chaos, clock, colormixer, forest, fractalcurves, lindenmayer, minimal_hanoi, nim, paint, peace, penrose, planet_and_moon, round_dance, sorting_animate, tree, two_canvases, yinyang, __main__
 
 functionss = [
@@ -31,19 +30,25 @@ functionss = [
 
 
 def main():
-    g = turtledemo.__dict__.values()
-    # print(g)
-    # print((len(g)))
+    pprint.pprint(turtledemo)
+    g = turtledemo.__dict__
+    empty = {}
+    allUsefullModules = []
     for a in g:
-        print(type(a))
-        print(a)
-        
-    return
-    print(turtledemo)
-    print(type(turtledemo.__dict__) )
-    for a in turtledemo.__dict__.values():
-        print(a)
-        print(type(a))
+        b  = g[a]
+        empty[str(b)] = b.__dir__()
+        if 'main' in b.__dir__():
+            allUsefullModules.append(b)
+    print(empty)
+    allUse = [g[y] for y in g if 'main' in g[y].__dir__()]
+    allString = [str(b) for b in allUse]
+    file = "TurtleDemo instructions.json"
+    with open(file, "w") as f:
+        json.dump(empty, f, indent=4)
+        pass
+    with open("turtledemoModules.json", 'w') as f:
+        json.dump(allString,f,indent=4) 
+    # print(allUsefullModules)
     pass
 
 
