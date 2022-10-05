@@ -11,7 +11,7 @@ def setup():
     turtle.pencolor(r_color())
     turtle.penup()
     turtle.setx(-100)
-    turtle.pendown()
+    turtle.pendown() 
     pass
 
 
