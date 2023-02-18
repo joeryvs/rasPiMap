@@ -53,3 +53,5 @@ dkms.conf
 
 
 *.txt
+# haskell files
+*.hi
