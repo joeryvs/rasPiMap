@@ -19,13 +19,13 @@ def requestData(url):
 
 
 def scrapeloop():
-
-    for x in itertools.count(1):
-        my_url = web_url(x)
-        response = requestData(my_url)
-        if response.code != 200:
+    for x in range(1,100):
+        my_url = f"{x}"
+        my_file = pathlib.Path("myFiles",f"pic{x}.png")
+        (filepath,httpresponse) = urllib.request.urlretrieve(my_url,my_file)
+        if httpresponse is None:
             return 
-        saveToFile(response.data)
+        
         
 
 def main():
