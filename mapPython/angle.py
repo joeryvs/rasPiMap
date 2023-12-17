@@ -1,8 +1,8 @@
 import turtle
 
 turtle.title = "GradenBoog"
-turtle.delay(0)
-turtle.speed(10)
+turtle.delay(0) # no delay
+turtle.speed(10) # maximum speed 
 for b in range(0,360,10):
     t1 = turtle.clone()
     t1.left(b)
