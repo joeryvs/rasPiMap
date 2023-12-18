@@ -17,14 +17,30 @@ def requestData(url):
     with urllib.request.Request(url) as req:
         pass
 
-
-def scrapeloop():
-    for x in range(1,100):
-        my_url = f"{x}"
-        my_file = pathlib.Path("myFiles",f"pic{x}.png")
-        (filepath,httpresponse) = urllib.request.urlretrieve(my_url,my_file)
-        if httpresponse is None:
+def ravenScrape():
+    url2 = "https://imgs.xkcd.com/comics/the_raven.jpg"
+    with urllib.request.urlopen(url2) as response:
+        if response is None :
+            return
+        if response.status != 200:
+            print ("no file")
             return 
+        with open("raven_1.jpg","wb") as f:
+            f.write(response.read())
+def scrapeloop():
+    for x in range(1000):
+        my_url = f"https://hot.leanbox.us/manga/Onepunch-Man/0001-{(str(x).zfill(3))}.png"
+        print(my_url)
+        with urllib.request.urlopen(my_url) as response:
+            if response is None :
+                return
+            if response.status != 200:
+                print ("no file")
+                return 
+            my_file = pathlib.Path("OnePunch",f"pic{x}.png")
+            with open(my_file,"wb") as f:
+                f.write(response.read())
+    return
         
         
 
