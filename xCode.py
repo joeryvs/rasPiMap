@@ -10,10 +10,10 @@ def main():
     sett = {}
     f = open('unicode.txt', 'w')
 
-    for let1 in "0123456789abcdef":
-        for let2 in "0123456789abcdef":
+    for let1 in range(16):
+        for let2 in range(16):
             try:
-                exec(F"qwer = \'\\x{let1}{let2}\'")
+                qwer = chr(16 * let1 + let2)
                 print(qwer)
                 print(qwer, file=f)
                 sett[f"{let1}{let2}"] = qwer
