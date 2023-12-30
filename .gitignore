@@ -56,3 +56,6 @@ dkms.conf
 *json
 # haskell files
 *.hi
+
+
+!zen.txt
