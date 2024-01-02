@@ -8,25 +8,25 @@ def web_url(n:int) -> str :
     return f"https://xkcd.com/{n}/"
 
 
-def getImageList_Lower(): 
-    for x in itertools.count(1):
-        my_url = web_url(x)
-        img = comicUrl(my_url)
-        if img is None:
-            return 
-        yield img
+def getImageList_1(): 
+    return getImageList(range(1,404))
 
-def getImageList_Upper():
-    for x in itertools.count(405):
-        my_url = web_url(x)
-        img = comicUrl(my_url)
-        if img is None:
-            return 
-        yield img
+def getImageList_2():
+    return getImageList(range(405,1350))
+
+def getImageList_3():
+    return getImageList(range(1351,1608))
+
+def getImageList_4():
+    return getImageList(itertools.count(1609))
+
+def getImageList(my_num_iter):
+    return filter(lambda a : a is not None ,(comicUrl(web_url(x)) for x in my_num_iter))
+    
 
 def saveImageList(file):
     with open(file=file,mode="w") as f:
-        for line in getImageList():
+        for line in getImageList_4():
             print(line,file=f)
 
 def comicUrl(url):
@@ -37,19 +37,15 @@ def comicUrl(url):
             return None
     soup = BeautifulSoup(textt,features="html.parser")
     outer = soup.find("div",id = "comic")
+    if outer is None :
+        return
     imgAttr = outer.findChild("img")
-    return imgAttr["src"]
+    if imgAttr is not None:
+        return imgAttr["src"]
+    else:
+        return None
 
-def saveToFile(pic,n:int) -> None:
-    filepath = pathlib.Path("myFiles",f"pic{n}.png")
-    with open(filepath,"w") as f:
-        pass
-    pass
 
-def requestData(url):
-
-    with urllib.request.Request(url) as req:
-        pass
 
 def ravenScrape():
     url2 = "https://imgs.xkcd.com/comics/the_raven.jpg"
@@ -62,27 +58,30 @@ def ravenScrape():
             return 
         with open("raven_3.jpg","wb") as f:
             f.write(response.read())
-def scrapeloop():
-    for x in range(1000):
-        my_url = f"https://hot.leanbox.us/manga/Onepunch-Man/0001-{(str(x).zfill(3))}.png"
+
+
+def scrapeloop(the_paths):
+    for my_url in the_paths:
+        my_url = pathlib.Path("https:" , my_url)
         print(my_url)
         with urllib.request.urlopen(my_url) as response:
             if response is None :
                 return
-            if response.status != 200:
-                print ("no file")
+            if 200 <= response.status < 300:
+                pa = pathlib.Path(g)
+                my_file = pathlib.Path("comics",pa.parts[-1])
+                with open(my_file,"wb") as f:
+                    f.write(response.read())
+            else:
+                print("no image")
                 return 
-            my_file = pathlib.Path("OnePunch",f"pic{x}.png")
-            with open(my_file,"wb") as f:
-                f.write(response.read())
     return
         
         
 
 def main():
     try:
-        # saveImageList(pathlib.Path("comics.txt"))
-        ravenScrape()
+        saveImageList(pathlib.Path("comics4.txt"))
     finally:
         pass
 
