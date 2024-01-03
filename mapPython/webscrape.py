@@ -62,26 +62,34 @@ def ravenScrape():
 
 def scrapeloop(the_paths):
     for my_url in the_paths:
-        my_url = pathlib.Path("https:" , my_url)
+        if not my_url:
+            return
+        my_url = "https:" + my_url
         print(my_url)
         with urllib.request.urlopen(my_url) as response:
             if response is None :
                 return
             if 200 <= response.status < 300:
-                pa = pathlib.Path(g)
-                my_file = pathlib.Path("comics",pa.parts[-1])
+                pa = pathlib.Path(my_url)
+                my_file = pathlib.Path("pornFolder",pa.parts[-1])
+                data = response.read()
                 with open(my_file,"wb") as f:
-                    f.write(response.read())
+                    f.write(data)
             else:
                 print("no image")
                 return 
     return
-        
+
+      
         
 
 def main():
     try:
-        saveImageList(pathlib.Path("comics4.txt"))
+        with open("comic_all.txt","r") as f:
+            g = f.readlines()
+        z = (x.removesuffix("\n") for x in g)
+        scrapeloop(z)
+        # saveImageList(pathlib.Path("comics4.txt"))
     finally:
         pass
 

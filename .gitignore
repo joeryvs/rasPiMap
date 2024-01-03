@@ -57,5 +57,5 @@ dkms.conf
 # haskell files
 *.hi
 
-
+mapPython/comics/
 !zen.txt
