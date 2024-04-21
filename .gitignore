@@ -58,4 +58,6 @@ dkms.conf
 *.hi
 
 mapPython/comics/
+mapPython/pornFolder/
+books/book_folder/
 !zen.txt

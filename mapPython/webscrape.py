@@ -3,6 +3,7 @@ import urllib.response
 import itertools
 import pathlib
 from bs4 import BeautifulSoup
+import re
 
 def web_url(n:int) -> str :
     return f"https://xkcd.com/{n}/"
@@ -63,15 +64,17 @@ def ravenScrape():
 def scrapeloop(the_paths):
     for my_url in the_paths:
         if not my_url:
-            return
+            continue
         my_url = "https:" + my_url
-        print(my_url)
+        pa = pathlib.Path(my_url)
+        my_file = pathlib.Path("pornFolder",pa.parts[-1])
+        if my_file.exists():
+            continue
+        print(my_url,my_file)
         with urllib.request.urlopen(my_url) as response:
             if response is None :
                 return
             if 200 <= response.status < 300:
-                pa = pathlib.Path(my_url)
-                my_file = pathlib.Path("pornFolder",pa.parts[-1])
                 data = response.read()
                 with open(my_file,"wb") as f:
                     f.write(data)
@@ -80,14 +83,17 @@ def scrapeloop(the_paths):
                 return 
     return
 
-      
+def scapable_url(url:str)-> bool:
+    if url.startswith("//"):
+        return True 
+    return False 
         
 
 def main():
     try:
         with open("comic_all.txt","r") as f:
             g = f.readlines()
-        z = (x.removesuffix("\n") for x in g)
+        z = (x.removesuffix("\n") for x in g if scapable_url(x))
         scrapeloop(z)
         # saveImageList(pathlib.Path("comics4.txt"))
     finally:
