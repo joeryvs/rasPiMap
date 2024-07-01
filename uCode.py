@@ -1,16 +1,34 @@
 
 import unicodedata
-
-with open('unicodeLarge2.txt', 'w') as f:
-    for comb in range(0,65536):
-        try:
-            # temp = F"{let1}{let2}{let3}{let4}"
-            qwer = chr(comb)
-            
-            # print(qwer)
-            print(comb, unicodedata.name(qwer), qwer, file=f, sep='\t')
-        except ValueError:
-            print('\t\tPrint Error occurred', file=f)
-            continue
+import emoji
+import string 
 
 
+def main():
+    # print(dir(emoji))
+    # emoji
+    # return
+    for comb in range(pow(2,16),pow(2,20)+1):
+
+        qwer = chr(comb)
+        
+        name = getName(qwer)
+        if name and len(name) and name.isprintable() and qwer and len(qwer) and qwer.isprintable():
+            print(comb, name, qwer, sep='\t')
+        
+
+
+def getName(character:str) -> str:
+    try:
+        return emoji.demojize(character)
+    except ValueError:
+        pass
+    try:
+        return unicodedata.name(character)
+    except ValueError:
+        return None
+
+
+
+if __name__ == "__main__":
+    main()
