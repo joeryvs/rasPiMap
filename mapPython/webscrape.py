@@ -38,7 +38,7 @@ def comicUrl(url):
             return None
     soup = BeautifulSoup(textt,features="html.parser")
     outer = soup.find("div",id = "comic")
-    if outer is None :
+    if outer is None:
         return
     imgAttr = outer.findChild("img")
     if imgAttr is not None:
@@ -52,7 +52,7 @@ def ravenScrape():
     url2 = "https://imgs.xkcd.com/comics/the_raven.jpg"
     url2 = "https:" + "//imgs.xkcd.com/comics/convincing_pickup_line.png"
     with urllib.request.urlopen(url2) as response:
-        if response is None :
+        if response is None:
             return
         if response.status != 200:
             print ("no file")
@@ -67,12 +67,12 @@ def scrapeloop(the_paths):
             continue
         my_url = "https:" + my_url
         pa = pathlib.Path(my_url)
-        my_file = pathlib.Path("pornFolder",pa.parts[-1])
+        my_file = pathlib.Path("xkcd 31-08-2024",pa.parts[-1])
         if my_file.exists():
             continue
         print(my_url,my_file)
         with urllib.request.urlopen(my_url) as response:
-            if response is None :
+            if response is None:
                 return
             if 200 <= response.status < 300:
                 data = response.read()
@@ -86,18 +86,19 @@ def scrapeloop(the_paths):
 def scapable_url(url:str)-> bool:
     if url.startswith("//"):
         return True 
+    print(url,"not scrapable")
     return False 
         
 
 def main():
-    try:
-        with open("comic_all.txt","r") as f:
+    if 1:
+        with open("comics_all2.txt",mode="rt",encoding="utf-8") as f:
             g = f.readlines()
         z = (x.removesuffix("\n") for x in g if scapable_url(x))
         scrapeloop(z)
-        # saveImageList(pathlib.Path("comics4.txt"))
-    finally:
-        pass
+    else:
+        saveImageList(pathlib.Path("comics5_31-08-2024.txt"))
+    
 
     pass
 
