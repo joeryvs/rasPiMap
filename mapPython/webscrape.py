@@ -67,7 +67,7 @@ def scrapeloop(the_paths):
             continue
         my_url = "https:" + my_url
         pa = pathlib.Path(my_url)
-        my_file = pathlib.Path("xkcd 31-08-2024",pa.parts[-1])
+        my_file = pathlib.Path("xkcd 18-08-2025",pa.parts[-1])
         if my_file.exists():
             continue
         print(my_url,my_file)

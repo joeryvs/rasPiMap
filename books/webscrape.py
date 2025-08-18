@@ -43,14 +43,16 @@ def book_cover_urls():
     tree = BeautifulSoup(data,features="html.parser")
     images = tree.find_all("img",recursive=True)
     print(len(images))
-    with open("book_covers.txt","w") as fw:
-        for i in images:
-            print(i["src"],file=fw)
+    sources = [img["src"] for img in images]
+    good_sources = ["https://boyter.org"  + source for source in sources]
+    with open("book_covers2.txt","w") as fw:
+        for i in good_sources:
+            print(i,file=fw)
 
 
 def main():
-    # book_cover_urls()
-    # return;
+    book_cover_urls()
+    return;
     try:
         print("start of scraping")
         with open("book_covers.txt","r") as f:
