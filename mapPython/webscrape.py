@@ -13,7 +13,9 @@ def getImageList_1():
     return getImageList(range(1,404))
 
 def getImageList_2():
-    return getImageList(range(405,1350))
+    return getImageList(itertools.count(405))
+    # return getImageList(range(405,1350))
+
 
 def getImageList_3():
     return getImageList(range(1351,1608))
@@ -27,7 +29,7 @@ def getImageList(my_num_iter):
 
 def saveImageList(file):
     with open(file=file,mode="w") as f:
-        for line in getImageList_4():
+        for line in getImageList_2():
             print(line,file=f)
 
 def comicUrl(url):
@@ -40,7 +42,7 @@ def comicUrl(url):
     outer = soup.find("div",id = "comic")
     if outer is None:
         return
-    imgAttr = outer.findChild("img")
+    imgAttr = outer.find("img")
     if imgAttr is not None:
         return imgAttr["src"]
     else:
@@ -91,13 +93,13 @@ def scapable_url(url:str)-> bool:
         
 
 def main():
-    if 1:
+    if 0:
         with open("comics_all2.txt",mode="rt",encoding="utf-8") as f:
             g = f.readlines()
         z = (x.removesuffix("\n") for x in g if scapable_url(x))
         scrapeloop(z)
     else:
-        saveImageList(pathlib.Path("comics5_31-08-2024.txt"))
+        saveImageList(pathlib.Path("comics2_23-08-2025.txt"))
     
 
     pass
