@@ -90,7 +90,7 @@ def wheelPrimeLoop(arr,n:int):
                 arr[j] = False
 
 
-    return [i for i,bool in enumerate(arr) if bool]
+    return (i for i,bool in enumerate(arr) if bool)
 
 
 def toFile(object: any, filenaam="WIP.json") -> None:
@@ -101,10 +101,10 @@ def toFile(object: any, filenaam="WIP.json") -> None:
 
 
 def main():
-    y = wheelPrime(400)
-    print(y)
-    y2 = wheelPrime2(400)
-    print(y2)
+    # y = wheelPrime(400)
+    # print(y)
+    y2 = wheelPrime2(40_000_000)
+    print(*y2,sep="\n")
     return
     g = looping()
     print("interrupt happened")
