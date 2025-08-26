@@ -1,6 +1,7 @@
 import itertools
 import math
 import json
+import array
 
 
 def isPriem(num: int) -> bool:
@@ -35,11 +36,54 @@ def looping() -> list[int]:
         pass
     return ans
 
+
+class BitSet:
+    def __init__(self,n):
+        arrLen = math.ceil(n / 8)
+        self.__array = array.array("B",[0 for _ in range(arrLen)])
+        self.__len = n
+        pass
+
+    def __len__(self):
+        return self.__len
+
+    def __getitem__(self, name):
+        x,y = divmod(name,8)
+        answer = self.__array[x] & (1 << y)
+        return bool(answer)
+    
+    def __setitem__(self, name, value):
+        x,y = divmod(name,8)
+        if value:
+            self.__array[x] = self.__array[x] | (1 << y)
+        else:
+            self.__array[x] = self.__array[x] & ~(1 << y)
+    def fillTrue(self):
+        for i in range(len(self.__array)):
+            self.__array[i] = (1<<8) -1
+        pass
+
+        
+
+
+
 def wheelPrime(n:int):
     arr = [True] * n 
 
     arr[0] = False
     arr[1] = False
+    return wheelPrimeLoop(arr,n)
+
+def wheelPrime2(n:int):
+    arr = BitSet(n)
+    arr.fillTrue()
+    arr[0] = False
+    arr[1] = False
+    return wheelPrimeLoop(arr,n)
+
+
+
+def wheelPrimeLoop(arr,n:int):
     for i in range(n):
         if arr[i]:
             for j in range(i*i,n,i):
@@ -47,6 +91,7 @@ def wheelPrime(n:int):
 
 
     return [i for i,bool in enumerate(arr) if bool]
+
 
 def toFile(object: any, filenaam="WIP.json") -> None:
     with open(filenaam, 'w') as f:
@@ -56,8 +101,10 @@ def toFile(object: any, filenaam="WIP.json") -> None:
 
 
 def main():
-    y = wheelPrime(40_000_000)
+    y = wheelPrime(400)
     print(y)
+    y2 = wheelPrime2(400)
+    print(y2)
     return
     g = looping()
     print("interrupt happened")
