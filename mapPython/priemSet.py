@@ -35,6 +35,18 @@ def looping() -> list[int]:
         pass
     return ans
 
+def wheelPrime(n:int):
+    arr = [True] * n 
+
+    arr[0] = False
+    arr[1] = False
+    for i in range(n):
+        if arr[i]:
+            for j in range(i*i,n,i):
+                arr[j] = False
+
+
+    return [i for i,bool in enumerate(arr) if bool]
 
 def toFile(object: any, filenaam="WIP.json") -> None:
     with open(filenaam, 'w') as f:
@@ -44,6 +56,9 @@ def toFile(object: any, filenaam="WIP.json") -> None:
 
 
 def main():
+    y = wheelPrime(40_000_000)
+    print(y)
+    return
     g = looping()
     print("interrupt happened")
     print(g)
