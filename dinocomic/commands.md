@@ -2,6 +2,7 @@
 **Download the html**
 ```
 curl "https://asofterworld.com/index.php?id=[1-1248]" -o index_#1.html
+curl "https://www.qwantz.com/index.php?comic=[1-4045]" -o index_#1.html
 ```
 
 
