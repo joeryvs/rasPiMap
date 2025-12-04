@@ -62,3 +62,6 @@ mapPython/pornFolder/
 mapPython/xkcd 31-08-2024/
 books/book_folder/
 !zen.txt
+*.html
+!zen_html.html
+!lorem.html
