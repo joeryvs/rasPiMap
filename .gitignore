@@ -51,6 +51,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+venv
 
 *.txt
 *json
@@ -65,3 +66,7 @@ books/book_folder/
 *.html
 !zen_html.html
 !lorem.html
+books/art*-*/
+books/test1/*
+books/img-*-*/
+!requirements.txt
