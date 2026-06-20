@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -eu
+
 today=$(date +%Y-%j)
 
 today_map=art-$today
@@ -18,7 +20,7 @@ curl https://www.deviantart.com/ -o "$today_index"
 # call python script
 python webscrape_dev.py images -i "$today_index" -o "art-$today.txt"
 # Download all images
-wget --user-agent=Mozilla --wait=0.2 --random-wait --input-file="../art-$today.txt" --directory-prefix="$today_map"
+wget --user-agent=Mozilla --wait=0.2 --random-wait --input-file="./art-$today.txt" --directory-prefix="$today_map"
 
 pwd
 # clean

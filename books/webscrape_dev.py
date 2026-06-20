@@ -1,11 +1,13 @@
 #!../venv/bin/python
 import argparse
+import collections
 import os
 import pathlib
 import re
 import sys
 import uuid
 from abc import ABC, abstractmethod
+from typing import Iterable
 
 from bs4 import BeautifulSoup
 
@@ -13,44 +15,30 @@ from bs4 import BeautifulSoup
 class Extractor(ABC):
     @classmethod
     def find_elements(cls, path, elm_name, **kwargs):
-        result = []
-        if not isinstance(path, list):
+        if not isinstance(path, Iterable):
             path = [path]
         for p in path:
-            with open(p, "r") as f:
-                data = f.read()
-            soup = BeautifulSoup(data, features="html.parser")
-            x = soup.find_all(name=elm_name, **kwargs)
-            for y in x:
-                result.append(y)
-        return result
-
-    @classmethod
-    def extract_pages_links(cls, input_path):
-        anchors = cls.find_elements(input_path, "a")
-        hrefs = [a["href"] for a in anchors if a.get("href", default=None)]
-        # remove duplicates
-        hrefs = list(dict.fromkeys(hrefs))
-        return hrefs
+            p = pathlib.Path(p)
+            if p.is_dir():
+                yield from cls.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
+            elif p.is_file():
+                with open(p, "r") as f:
+                    data = f.read()
+                soup = BeautifulSoup(data, features="html.parser")
+                yield from soup.find_all(name=elm_name, **kwargs)
 
     @abstractmethod
     def extract(self, input_path, output_path):
         pass
 
+    @abstractmethod
+    def retrieve(self, input_path):
+        return []
+
 
 class ImageExtractor(Extractor):
     def extract(self, input_path, output_path):
-        images = self.find_elements(input_path, "img")
-        # extract src
-        sources = [a["src"] for a in images if a.get("src", default=None)]
-        sourcesets = [a["srcset"] for a in images if a.get("srcset", default=None)]
-        # extract all from srcset
-        # split at ", " afterward split at a space and take the link part
-        sourcesets = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
-        art_links_regex = self.regex()
-        # take both
-        links = sources + sourcesets
-        art_links = [img for img in links if self.keep_string(art_links_regex, img)]
+        art_links = self.retrieve(input_path)
         # remove duplicates
         art_link_paths = list(dict.fromkeys(art_links))
         art_link_paths.sort()
@@ -61,23 +49,63 @@ class ImageExtractor(Extractor):
         with open(output_path, "a") as f:
             print(*art_link_paths, sep="\n", file=f)
 
+    def retrieve(self, input_path):
+        images = self.find_elements(input_path, "img")
+        images = list(images)
+        # extract src and src_set
+        sources = [a["src"] for a in images if a.get("src", default=None)]
+        sourcesets = [a["srcset"] for a in images if a.get("srcset", default=None)]
+        # extract all from srcset
+        # split at ", " afterward split at a space and take the link part
+        sourcesets = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
+        art_links_regex = self.regex()
+        # take both
+        links = sources + sourcesets
+        art_links = [img for img in links if self.keep_string(art_links_regex, img)]
+        return art_links
+
     def keep_string(self, regex, string):
         return regex.match(string)
 
     def regex(self):
+        return re.compile(r"^https://.*$")
+
+
+class DeviantArtImageExtractor(ImageExtractor):
+    def regex(self):
         return re.compile(r"^.*/images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/.+$")
 
 
-class LargeImageExtractor(ImageExtractor):
+class AllImagesExtractor(DeviantArtImageExtractor):
     def keep_string(self, regex, string):
-        return super().keep_string(regex, string) and "92s" not in string
+        return True
+
+
+class NoCropImageExtractor(DeviantArtImageExtractor):
+    def keep_string(self, regex, string):
+        return super().keep_string(regex, string) and "/crop/" not in string
+
+
+class LargeImageExtractor(DeviantArtImageExtractor):
+    def regex(self):
+        return re.compile(
+            r"^.*/images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/\w/(\d|\w|\-)+/(\d|\w|\-|\.)+\?token=(.*)$"
+        )
+
+    # def keep_string(self, regex, string):
+    #     return (
+    #         super().keep_string(regex, string)
+    #         and "/crop/" not in string
+    #         and "/fit/" not in string
+    #         and "/fill/" not in string
+    #     )
 
 
 class PageExtractor(Extractor, ABC):
     def extract(self, input_path, output_path):
         hrefs = self.extract_pages_links(input_path=input_path)
         art_links_regex = self.extract_regex()
-        art_links = [href for href in hrefs if art_links_regex.match(href)]
+        art_links = (href for href in hrefs if art_links_regex.match(href))
 
         # remove duplicates
         art_link_paths = list(dict.fromkeys(map(self.post_proces_function, art_links)))
@@ -87,6 +115,13 @@ class PageExtractor(Extractor, ABC):
         print(*art_link_paths, sep="\n")
         with open(output_path, "a") as f:
             print(*art_link_paths, sep="\n", file=f)
+
+    def retrieve(self, input_path):
+        anchors = self.find_elements(input_path, "a")
+        hrefs = (str(a["href"]) for a in anchors if a.get("href", default=None))
+        art_links_regex = self.extract_regex()
+        art_links = (href for href in hrefs if art_links_regex.match(href))
+        return list(art_links)
 
     @abstractmethod
     def extract_regex(self) -> re.Pattern:
@@ -136,7 +171,8 @@ class DescriptionExtractor(Extractor):
                 print("ERROR input file has no description section")
                 continue
             print(section)
-            output = "\n\n".join(section.strings)
+
+            output = "\n\n".join(x.get_text() for x in section.find_all(["h1", "h2", "h3", "h4", "h5", "p"]))
             path1 = output_path / f"{uuid.uuid4().hex}.txt"
 
             with open(path1, "w", encoding=sys.getfilesystemencoding()) as f:
@@ -149,8 +185,10 @@ class DescriptionExtractor(Extractor):
 class ExtractorFactory:
     _options = {
         "art": ArtPageExtractor,
-        "images": ImageExtractor,
+        "images": DeviantArtImageExtractor,
         "large_images": LargeImageExtractor,
+        "no_crop": NoCropImageExtractor,
+        "all_images": AllImagesExtractor,
         "users": UserPageExtractor,
         "tags": TagPageExtractor,
         "description": DescriptionExtractor,

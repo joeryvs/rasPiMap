@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -u
+
 show_help() {
     cat << EOF
     USAGE: ${0##/} (dir)+
@@ -33,7 +35,7 @@ rename_file() {
     new_name=${ARR[0]}
     NEW_NAME="$parent_dir/$new_name"
     echo $NEW_NAME
-    mv --verbose --interactive "$OLD_NAME" "$NEW_NAME"
+    mv --verbose --no-clobber "$OLD_NAME" "$NEW_NAME"
 }
 
 # verify all positinal arguments point to a directory
