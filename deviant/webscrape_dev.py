@@ -1,11 +1,9 @@
 #!../venv/bin/python
 import argparse
-import collections
 import os
 import pathlib
 import re
 import sys
-import uuid
 from abc import ABC, abstractmethod
 from typing import Iterable
 
@@ -69,6 +67,11 @@ class ImageExtractor(Extractor):
 
     def regex(self):
         return re.compile(r"^https://.*$")
+
+
+class AvatarExtractor(ImageExtractor):
+    def regex(self):
+        return re.compile(r"^https://a.deviantart.net/.*$")
 
 
 class DeviantArtImageExtractor(ImageExtractor):
