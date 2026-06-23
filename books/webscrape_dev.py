@@ -103,10 +103,7 @@ class LargeImageExtractor(DeviantArtImageExtractor):
 
 class PageExtractor(Extractor, ABC):
     def extract(self, input_path, output_path):
-        hrefs = self.extract_pages_links(input_path=input_path)
-        art_links_regex = self.extract_regex()
-        art_links = (href for href in hrefs if art_links_regex.match(href))
-
+        art_links = self.retrieve(input_path)
         # remove duplicates
         art_link_paths = list(dict.fromkeys(map(self.post_proces_function, art_links)))
         art_link_paths.sort()
@@ -140,6 +137,11 @@ class ArtPageExtractor(PageExtractor):
         return link.removesuffix("#comments")
 
 
+class AllPagesExtractor(PageExtractor):
+    def extract_regex(self) -> re.Pattern:
+        return re.compile(".*")
+
+
 class UserPageExtractor(PageExtractor):
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/gallery.*$")
@@ -154,12 +156,18 @@ class DescriptionExtractor(Extractor):
     def extract(self, input_path, output_path):
         if not isinstance(input_path, list):
             input_path = [input_path]
+
+        input_path = [
+            y
+            for i in input_path
+            for ys in [[pathlib.Path(i) / z for z in os.listdir(i)] if pathlib.Path(i).is_dir() else [pathlib.Path(i)]]
+            for y in ys
+            if y.is_file()
+        ]
         if isinstance(output_path, str):
             output_path = pathlib.Path(output_path)
-            os.makedirs(output_path, exist_ok=True)
-
+        os.makedirs(output_path, exist_ok=True)
         for input in input_path:
-            input = pathlib.Path(input)
             if not input.exists():
                 print("ERROR input file does not exist")
                 continue
@@ -173,13 +181,12 @@ class DescriptionExtractor(Extractor):
             print(section)
 
             output = "\n\n".join(x.get_text() for x in section.find_all(["h1", "h2", "h3", "h4", "h5", "p"]))
-            path1 = output_path / f"{uuid.uuid4().hex}.txt"
+            path = output_path / input.name
+            with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
+                print(output, file=f)
 
-            with open(path1, "w", encoding=sys.getfilesystemencoding()) as f:
-                print(output, file=f)
-            path2 = output_path / input.name
-            with open(path2, "w", encoding=sys.getfilesystemencoding()) as f:
-                print(output, file=f)
+    def retrieve(self, input_path):
+        return super().retrieve(input_path)
 
 
 class ExtractorFactory:
@@ -190,6 +197,7 @@ class ExtractorFactory:
         "no_crop": NoCropImageExtractor,
         "all_images": AllImagesExtractor,
         "users": UserPageExtractor,
+        "all_links": AllPagesExtractor,
         "tags": TagPageExtractor,
         "description": DescriptionExtractor,
     }
