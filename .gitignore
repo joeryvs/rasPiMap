@@ -58,6 +58,7 @@ venv
 # haskell files
 *.hi
 
+__pycache__/
 mapPython/comics/
 mapPython/pornFolder/
 mapPython/xkcd 31-08-2024/
