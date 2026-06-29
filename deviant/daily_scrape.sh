@@ -10,6 +10,11 @@ echo $today
 echo $today_map
 echo $today_index
 
+if [[ -n $VIRTUAL_ENV ]] ; then
+    echo "not in a virtual env exiting"
+    exit 1;
+fi
+
 if [ -d $today_map ] ; then
     echo "directory exist no longer. ending call"
     exit 1;

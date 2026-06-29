@@ -1,4 +1,5 @@
 #!../venv/bin/python
+import itertools
 import os
 import pathlib
 import re
@@ -23,17 +24,21 @@ class Extractor(ABC):
                     data = f.read()
                 soup = BeautifulSoup(data, features="html.parser")
                 yield from soup.find_all(name=elm_name, **kwargs)
+            else:
+                print("ERROR ARGUMENT IS NOT A FILE")
 
     @abstractmethod
     def extract(self, input_path, output_path):
         pass
 
     @abstractmethod
-    def retrieve(self, input_path):
+    def retrieve(self, input_path) -> Iterable:
         return []
 
 
 class ImageExtractor(Extractor):
+    _include_srcset = True
+
     def extract(self, input_path, output_path):
         art_links = self.retrieve(input_path)
         # remove duplicates
@@ -47,54 +52,70 @@ class ImageExtractor(Extractor):
             print(*art_link_paths, sep="\n", file=f)
 
     def retrieve(self, input_path):
-        images = self.find_elements(input_path, "img")
+        images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
         images = list(images)
         # extract src and src_set
-        sources = [a["src"] for a in images if a.get("src", default=None)]
-        sourcesets = [a["srcset"] for a in images if a.get("srcset", default=None)]
-        # extract all from srcset
-        # split at ", " afterward split at a space and take the link part
-        sourcesets = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
-        art_links_regex = self.regex()
-        # take both
-        links = sources + sourcesets
-        art_links = [img for img in links if self.keep_string(art_links_regex, img)]
+        sources = (a["src"] for a in images if a.get("src", default=None))
+        if self._include_srcset:
+            sourcesets = (a["srcset"] for a in images if a.get("srcset", default=None))
+            # extract all from srcset
+            # split at ", " afterward split at a space and take the link part
+            sourceset_urls = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
+            sources = itertools.chain(sources, sourceset_urls)
+
+        art_links_regex = self._regex()
+        art_links = (img for img in sources if self._keep_string(art_links_regex, img))
         return art_links
 
-    def keep_string(self, regex, string):
+    def _find_elements_kwargs(self):
+        return {}
+
+    def _keep_string(self, regex, string):
         return regex.match(string)
 
-    def regex(self):
+    def _regex(self):
         return re.compile(r"^https://.*$")
 
 
 class AvatarExtractor(ImageExtractor):
-    def regex(self):
+    def _regex(self):
         return re.compile(r"^https://a.deviantart.net/.*$")
 
 
 class DeviantArtImageExtractor(ImageExtractor):
-    def regex(self):
+    def _regex(self):
         return re.compile(r"^.*/images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/.+$")
 
 
 class AllImagesExtractor(DeviantArtImageExtractor):
-    def keep_string(self, regex, string):
+    def _keep_string(self, regex, string):
         return True
 
 
+class MainImageExtractor(ImageExtractor):
+    _include_srcset = False
+
+    def _find_elements_kwargs(self):
+        MAIN_IMAGE_CLASS = "_Cyjpk"
+        return {"class_": MAIN_IMAGE_CLASS}
+
+
 class NoCropImageExtractor(DeviantArtImageExtractor):
-    def keep_string(self, regex, string):
-        return super().keep_string(regex, string) and "/crop/" not in string
+    def _keep_string(self, regex, string):
+        return super()._keep_string(regex, string) and "/crop/" not in string
+
+
+class NoCropImageExtractorLarge(NoCropImageExtractor):
+    _include_srcset = False
 
 
 class LargeImageExtractor(DeviantArtImageExtractor):
-    def regex(self):
+    def _regex(self):
         return re.compile(
             r"^.*/images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/\w/(\d|\w|\-)+/(\d|\w|\-|\.)+\?token=(.*)$"
         )
 
-    # def keep_string(self, regex, string):
+    # def _keep_string(self, regex, string):
     #     return (
     #         super().keep_string(regex, string)
     #         and "/crop/" not in string
@@ -192,28 +213,25 @@ class DescriptionExtractor(Extractor):
 
 
 class ExtractorFactory:
-    _options = {
-        "art": ArtPageExtractor,
-        "images": DeviantArtImageExtractor,
-        "large_images": LargeImageExtractor,
-        "no_crop": NoCropImageExtractor,
-        "all_images": AllImagesExtractor,
-        "avatar": AvatarExtractor,
-        "users": UserPageExtractor,
-        "all_links": AllPagesExtractor,
-        "tags": TagPageExtractor,
-        "description": DescriptionExtractor,
-    }
-
-    def __init__(self, item):
-        self.item = item
-        if self.item not in self._options:
-            raise Exception
-
-    @classmethod
-    def options(cls):
-        return list(cls._options.keys())
+    def __init__(self):
+        self._options = {
+            "art": ArtPageExtractor,
+            "images": DeviantArtImageExtractor,
+            "large_images": LargeImageExtractor,
+            "no_crop": NoCropImageExtractor,
+            "no_crop_large": NoCropImageExtractorLarge,
+            "all_images": AllImagesExtractor,
+            "main_image": MainImageExtractor,
+            "avatar": AvatarExtractor,
+            "users": UserPageExtractor,
+            "all_links": AllPagesExtractor,
+            "tags": TagPageExtractor,
+            "description": DescriptionExtractor,
+        }
 
     @property
-    def extractor(self) -> Extractor:
-        return self._options[self.item]()
+    def choices(self):
+        return list(self._options.keys())
+
+    def extractor(self, item, *args, **kwargs) -> Extractor:
+        return self._options[item](*args, **kwargs)
