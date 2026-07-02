@@ -10,7 +10,7 @@ echo $today
 echo $today_map
 echo $today_index
 
-if [[ -n $VIRTUAL_ENV ]] ; then
+if [[ ! -n $VIRTUAL_ENV ]] ; then
     echo "not in a virtual env exiting"
     exit 1;
 fi

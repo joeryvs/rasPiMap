@@ -9,23 +9,22 @@ fi
 
 
 # CHANGE constants on next run
-ART_PAGE_URL="eravuru_pages.txt"
-ART_PAGE_STORE_DIR="eravuru_art"
+user="eravuru"
+ART_PAGE_URL=""$user"_pages.txt"
+ART_PAGE_STORE_DIR=""$user"_art"
 
-IMAGE_LOCATION="eravuru_images_full"
-DESCRIPTION_LOCATION="eravuru_description"
+IMAGE_URLS_FILE=""$user"_main_image.txt"
+IMAGE_LOCATION=""$user"_main_images"
+DESCRIPTION_LOCATION=""$user"_description"
+
 
 # download each page using wget
-# wget --input-file="$ART_PAGE_URL" --directory-prefix="$ART_PAGE_STORE_DIR" --random-wait --wait="$WAIT_TIME"
-
+wget --input-file="$ART_PAGE_URL" --directory-prefix="$ART_PAGE_STORE_DIR" --random-wait --wait="$WAIT_TIME"
 # find all img locations
-# python webscrape_dev.py main_image -i "$ART_PAGE_STORE_DIR" -o "eravuru_main_image.txt"
-
+python webscrape_dev.py main_image -i "$ART_PAGE_STORE_DIR" -o "$IMAGE_URLS_FILE"
 # write description folder
-# python webscrape_dev.py description -i "$ART_PAGE_STORE_DIR" -o "$DESCRIPTION_LOCATION"
-
+python webscrape_dev.py description -i "$ART_PAGE_STORE_DIR" -o "$DESCRIPTION_LOCATION"
 # download images
-wget --input-file="eravuru_main_image.txt" --directory-prefix="eravuru_main_image.txt" --random-wait --wait="$WAIT_TIME"
-
+wget --input-file="$IMAGE_URLS_FILE" --directory-prefix="$IMAGE_LOCATION" --random-wait --wait="$WAIT_TIME"
 # rename file
 ../remove_post.sh "$IMAGE_LOCATION"
