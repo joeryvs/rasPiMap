@@ -1,6 +1,7 @@
 import unittest
 
 import webscrape_extractors
+from bs4 import BeautifulSoup
 
 
 class TestBaseExtractor(unittest.TestCase):
@@ -40,6 +41,18 @@ class TestImageExtractor(unittest.TestCase):
         for url in no_match_urls:
             with self.subTest(url=url, regex=regex):
                 self.assertNotRegex(url, regex)
+
+    def test_retrieve_img_src(self):
+
+        html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3.png 4x'/>"""
+        anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.extractor = webscrape_extractors.ImageExtractor()
+
+        sources = list(self.extractor.retrieve_img_src(anchor))
+
+        expected = ["https://1.png", "https://2.png", "https://3.png"]
+        self.assertEqual(sources, expected)
+        self.assertEqual(len(sources), 3)
 
 
 class TestAvatarExtractor(unittest.TestCase):

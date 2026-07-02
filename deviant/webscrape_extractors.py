@@ -1,10 +1,10 @@
 #!../venv/bin/python
-import itertools
 import os
 import pathlib
 import re
 import sys
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from typing import Iterable
 
 from bs4 import BeautifulSoup
@@ -36,6 +36,9 @@ class Extractor(ABC):
         return []
 
 
+ImageTypes = namedtuple("ImageType", ["src", "type"])
+
+
 class ImageExtractor(Extractor):
     _include_srcset = True
 
@@ -55,17 +58,30 @@ class ImageExtractor(Extractor):
         images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
         images = list(images)
         # extract src and src_set
-        sources = (a["src"] for a in images if a.get("src", default=None))
-        if self._include_srcset:
-            sourcesets = (a["srcset"] for a in images if a.get("srcset", default=None))
-            # extract all from srcset
-            # split at ", " afterward split at a space and take the link part
-            sourceset_urls = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
-            sources = itertools.chain(sources, sourceset_urls)
-
+        # sources = (a["src"] for a in images if a.get("src", default=None))
+        # if self._include_srcset:
+        #     sourcesets = (a["srcset"] for a in images if a.get("srcset", default=None))
+        #     # extract all from srcset
+        #     # split at ", " afterward split at a space and take the link part
+        #     sourceset_urls = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
+        #     sources = itertools.chain(sources, sourceset_urls)
+        # sources = itertools.chain(*(self.retrieve_img_src(i) for i in images))
+        sources = (src.src for srcs in (self.retrieve_img_src(i) for i in images) for src in srcs)
         art_links_regex = self._regex()
         art_links = (img for img in sources if self._keep_string(art_links_regex, img))
         return art_links
+
+    def retrieve_img_src(self, anchor):
+        if anchor.get("src"):
+            yield ImageTypes(anchor["src"], "main")
+
+        if self._include_srcset:
+            srcset = anchor.get("srcset", default=None)
+            if srcset:
+                x = srcset.split(", ")
+                for y in x:
+                    z = y.split(" ")
+                    yield ImageTypes(z[0].strip(), z[1].strip())
 
     def _find_elements_kwargs(self):
         return {}
@@ -93,11 +109,18 @@ class AllImagesExtractor(DeviantArtImageExtractor):
 
 
 class MainImageExtractor(ImageExtractor):
-    _include_srcset = False
+    # _include_srcset = False
 
     def _find_elements_kwargs(self):
         MAIN_IMAGE_CLASS = "_Cyjpk"
         return {"class_": MAIN_IMAGE_CLASS}
+
+    def retrieve_img_src(self, anchor):
+        print(anchor)
+        result = list(super().retrieve_img_src(anchor))
+
+        print(*map(lambda x: x.type, result), sep="\n")
+        return result
 
 
 class NoCropImageExtractor(DeviantArtImageExtractor):
@@ -106,7 +129,16 @@ class NoCropImageExtractor(DeviantArtImageExtractor):
 
 
 class NoCropImageExtractorLarge(NoCropImageExtractor):
-    _include_srcset = False
+    # _include_srcset = False
+
+    def retrieve_img_src(self, anchor):
+        parent = list(super().retrieve_img_src(anchor))
+        print(parent)
+
+        if res := filter(lambda x: x.type == "2x", parent):
+            yield from res
+        else:
+            yield from parent
 
 
 class LargeImageExtractor(DeviantArtImageExtractor):
@@ -212,6 +244,34 @@ class DescriptionExtractor(Extractor):
         return super().retrieve(input_path)
 
 
+class JsonExtractor(Extractor):
+    def retrieve(self, input_path) -> Iterable:
+        a = self.find_elements(input_path, "script")
+        for b in a:
+            # print(b)
+            text = b.text
+            # if b.is_empty_element:
+            # print("empty")
+            # continue
+            # print(dir(b))
+            # print(text)
+            regex = re.compile(r"baseUri")
+            if "baseUri" in text:
+                print(text)
+            if x := regex.match(text):
+                print(text)
+                print()
+                print(x)
+
+                input()
+        return super().retrieve(input_path)
+
+    def extract(self, input_path, output_path):
+
+        scripts = self.retrieve(input_path=input_path)
+        return super().extract(input_path, output_path)
+
+
 class ExtractorFactory:
     def __init__(self):
         self._options = {
@@ -227,6 +287,7 @@ class ExtractorFactory:
             "all_links": AllPagesExtractor,
             "tags": TagPageExtractor,
             "description": DescriptionExtractor,
+            "json": JsonExtractor,
         }
 
     @property

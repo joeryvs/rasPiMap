@@ -34,7 +34,7 @@ rename_file_to_extension() {
     HASH_FILENAME=($HASH_FILENAME)
     HASH=${HASH_FILENAME[0]}
     PARENT_DIR="$(dirname "$OLD_NAME")"
-
+    NEW_NAME=""
     case $TYPE in
         image/webp)
             NEW_NAME="$PARENT_DIR/$HASH.webp"
@@ -54,10 +54,22 @@ rename_file_to_extension() {
         image/gif)
             NEW_NAME="$PARENT_DIR/$HASH.gif"
             ;;
+        image/svg+xml)
+            NEW_NAME="$PARENT_DIR/$HASH.svg"
+            ;;
+        apllication/javascript)
+            NEW_NAME="$PARENT_DIR/$HASH.js"
+            ;;
+        text/plain)
+            NEW_NAME="$PARENT_DIR/$HASH.txt"
+            ;;
+        text/html)
+            NEW_NAME="$PARENT_DIR/$HASH.html"
+            ;;
     esac
 
-    if [ -n $NEW_NAME ]; then
-        mv --verbose --interactive "$OLD_NAME" "$NEW_NAME"
+    if [ ! -z $NEW_NAME ]; then
+        mv --verbose "$OLD_NAME" "$NEW_NAME"
     else
         echo "didnt rename '$OLD_NAME', because '$TYPE' is not accounted for"
     fi
