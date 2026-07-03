@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-WAIT_TIME=0.7
+WAIT_TIME=11
 
 if [[ ! -n $(echo "$VIRTUAL_ENV") ]] ; then
     echo "PROGRAM NOT IN VENV EXITING"
@@ -9,9 +9,15 @@ fi
 
 
 # CHANGE constants on next run
-user="eravuru"
+user="ivatent"
 ART_PAGE_URL=""$user"_pages.txt"
-ART_PAGE_STORE_DIR=""$user"_art"
+
+if [[ ! -r $ART_PAGE_URL ]]; then
+    echo "$ART_PAGE_URL does not exist or no read access"
+    exit 1
+fi
+ART_PAGE_STORE_DIR="Art-Pages/"$user"_art"
+
 
 IMAGE_URLS_FILE=""$user"_main_image.txt"
 IMAGE_LOCATION=""$user"_main_images"

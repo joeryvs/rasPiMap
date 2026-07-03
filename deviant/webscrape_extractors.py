@@ -5,6 +5,7 @@ import re
 import sys
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from collections.abc import Generator
 from typing import Iterable
 
 from bs4 import BeautifulSoup
@@ -45,18 +46,23 @@ class ImageExtractor(Extractor):
     def extract(self, input_path, output_path):
         art_links = self.retrieve(input_path)
         # remove duplicates
-        art_link_paths = list(dict.fromkeys(art_links))
-        art_link_paths.sort()
-        print("len art_link_paths: ", len(art_link_paths))
-        print()
+        # art_link_paths = list(dict.fromkeys(art_links))
+        art_link_paths = art_links
+        # art_link_paths.sort()
+        # print("len art_link_paths: ", len(art_link_paths))
+        # print()
         print("art_links are: ")
-        print(*art_link_paths, sep="\n")
+        links = []
+        # print(*art_link_paths, sep="\n")
         with open(output_path, "a") as f:
-            print(*art_link_paths, sep="\n", file=f)
+            for p in art_link_paths:
+                links.append(p)
+                print(p, file=f)
+            # print(*art_link_paths, sep="\n", file=f)
 
-    def retrieve(self, input_path):
+    def retrieve(self, input_path) -> Generator[str]:
         images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
-        images = list(images)
+        # images = list(images)
         # extract src and src_set
         # sources = (a["src"] for a in images if a.get("src", default=None))
         # if self._include_srcset:
@@ -71,7 +77,7 @@ class ImageExtractor(Extractor):
         art_links = (img for img in sources if self._keep_string(art_links_regex, img))
         return art_links
 
-    def retrieve_img_src(self, anchor):
+    def retrieve_img_src(self, anchor) -> Generator[ImageTypes]:
         if anchor.get("src"):
             yield ImageTypes(anchor["src"], "main")
 
@@ -103,24 +109,25 @@ class DeviantArtImageExtractor(ImageExtractor):
         return re.compile(r"^.*/images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/.+$")
 
 
+class DeviantArtImage2XExtractor(DeviantArtImageExtractor):
+    def retrieve_img_src(self, anchor):
+        return (x for x in super().retrieve_img_src(anchor) if x.type == "2x")
+
+
 class AllImagesExtractor(DeviantArtImageExtractor):
     def _keep_string(self, regex, string):
         return True
 
 
 class MainImageExtractor(ImageExtractor):
-    # _include_srcset = False
+    _include_srcset = False
 
     def _find_elements_kwargs(self):
         MAIN_IMAGE_CLASS = "_Cyjpk"
         return {"class_": MAIN_IMAGE_CLASS}
 
     def retrieve_img_src(self, anchor):
-        print(anchor)
-        result = list(super().retrieve_img_src(anchor))
-
-        print(*map(lambda x: x.type, result), sep="\n")
-        return result
+        return super().retrieve_img_src(anchor)
 
 
 class NoCropImageExtractor(DeviantArtImageExtractor):
@@ -129,16 +136,16 @@ class NoCropImageExtractor(DeviantArtImageExtractor):
 
 
 class NoCropImageExtractorLarge(NoCropImageExtractor):
-    # _include_srcset = False
+    _include_srcset = False
 
-    def retrieve_img_src(self, anchor):
-        parent = list(super().retrieve_img_src(anchor))
-        print(parent)
+    # def retrieve_img_src(self, anchor):
+    #     parent = list(super().retrieve_img_src(anchor))
+    #     print(parent)
 
-        if res := filter(lambda x: x.type == "2x", parent):
-            yield from res
-        else:
-            yield from parent
+    #     if res := filter(lambda x: x.type == "2x", parent):
+    #         yield from res
+    #     else:
+    #         yield from parent
 
 
 class LargeImageExtractor(DeviantArtImageExtractor):
@@ -277,6 +284,7 @@ class ExtractorFactory:
         self._options = {
             "art": ArtPageExtractor,
             "images": DeviantArtImageExtractor,
+            "images2x": DeviantArtImage2XExtractor,
             "large_images": LargeImageExtractor,
             "no_crop": NoCropImageExtractor,
             "no_crop_large": NoCropImageExtractorLarge,

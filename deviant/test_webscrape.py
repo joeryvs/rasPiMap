@@ -50,7 +50,8 @@ class TestImageExtractor(unittest.TestCase):
 
         sources = list(self.extractor.retrieve_img_src(anchor))
 
-        expected = ["https://1.png", "https://2.png", "https://3.png"]
+        expected = [("https://1.png", "main"), ("https://2.png", "2x"), ("https://3.png", "4x")]
+        self.assertListEqual(sources, expected)
         self.assertEqual(sources, expected)
         self.assertEqual(len(sources), 3)
 
@@ -70,6 +71,23 @@ class TestAvatarExtractor(unittest.TestCase):
         self.assertNotRegex("https://www.example.com", regex)
 
 
+class TestMainImageExtractor(unittest.TestCase):
+    def test_retrieve_img_src(self):
+
+        html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3.png 4x'/>"""
+        anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.extractor = webscrape_extractors.MainImageExtractor()
+
+        self.assertFalse(self.extractor._include_srcset)
+
+        sources = list(self.extractor.retrieve_img_src(anchor))
+
+        expected = [("https://1.png", "main")]
+        self.assertListEqual(sources, expected)
+        self.assertEqual(sources, expected)
+        self.assertEqual(len(sources), 1)
+
+
 class TestExtractorFactory(unittest.TestCase):
     def setUp(self) -> None:
         self.factory = webscrape_extractors.ExtractorFactory()
@@ -78,6 +96,7 @@ class TestExtractorFactory(unittest.TestCase):
     def test_contains_keys(self):
 
         self.assertIn("images", self.factory.choices)
+        self.assertIn("images2x", self.factory.choices)
         self.assertIn("art", self.factory.choices)
         self.assertIn("users", self.factory.choices)
         self.assertIn("all_images", self.factory.choices)

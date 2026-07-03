@@ -5,9 +5,11 @@ set -eu
 today=$(date +%Y-%j)
 
 today_map=art-$today
-today_index=index-$today.html
+today_index=front-page/index-$today.html
+today_art_links="art-$today.txt"
 echo $today
 echo $today_map
+
 echo $today_index
 
 if [[ ! -n $VIRTUAL_ENV ]] ; then
@@ -23,7 +25,9 @@ fi
 mkdir -p $today_map
 curl https://www.deviantart.com/ -o "$today_index"
 # call python script
-python webscrape_dev.py images -i "$today_index" -o "art-$today.txt"
+python webscrape_dev.py images2x -i "$today_index" -o "$today_art_links"
+# sort and unique
+sort "$today_art_links" --unique -o "$today_art_links"
 # Download all images
 wget --user-agent=Mozilla --wait=0.2 --random-wait --input-file="./art-$today.txt" --directory-prefix="$today_map"
 
