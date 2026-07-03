@@ -71,7 +71,7 @@ def website_url(url):
 
 
 def local_searching(url):
-    path = "deviant/Art-Pages/ivatant_art/Once-a-General-Now-a-Plaything-1080996029"
+    path = url
     collected_links = []
 
     def cancel_all_but_main_reroute(route):
@@ -99,15 +99,67 @@ def local_searching(url):
             print(type(testdata))
 
 
+def keep_content_type(content_type):
+    return True
+
+
+CONTENT_TYPES = {
+    "text/html": ".html",
+    "text/javascript": ".js",
+    "text/css": ".css",
+    "image/png": ".png",
+    "image/jpg": ".jpg",
+    "image/jpeg": ".jpeg",
+    "image/svg": ".svg",
+    "image/webp": ".webp",
+    "font/woff2": ".woff2",
+}
+
+
+def get_content_type_extension(content_type):
+    content_type = content_type.split("; ")[0]
+    if content_type in CONTENT_TYPES:
+        return CONTENT_TYPES[content_type]
+    print(content_type)
+    return ""
+
+
 def google_search(params):
-    data = {"q": params, "udm": 2}
+    data = {"q": " ".join(params), "udm": 2}
     URL = "https://www.google.com/search?" + urllib.parse.urlencode(data)
+    # URL = "https://www.example.com/"
+    # URL = "https://playwright.dev/python/"
+    # URL = "https://playwright.dev/"
+    current_scrape_dir = pathlib.Path(uuid.uuid4().hex[:12])
+    os.mkdir(current_scrape_dir)
+    print(current_scrape_dir.name)
+    urls = []
+
+    def reroute_url(route):
+        # print(route.request.url)
+        urls.append(route.request.url)
+        response = route.fetch()
+        headers = response.headers
+        # print(headers)
+        if keep_content_type(headers.get("content-type")):
+            extension: str = get_content_type_extension(headers["content-type"])
+            new_path = current_scrape_dir / uuid.uuid4().hex[:12]
+            new_path = new_path.with_suffix(extension)
+            # new_path.suffix = extension
+            with open(new_path, "wb+") as f:
+                f.write(response.body())
+        route.fulfill(response=response)
+
     with sync_playwright() as p:
         with p.webkit.launch() as browser:
-            help(browser.new_page)
-            page = browser.new_page(offline=True)
-
+            # help(browser.new_page)
+            page = browser.new_page()
+            page.route("**/*", reroute_url)
             page.goto(URL)
+            print(page.url)
+            page.screenshot(path="example3.png")
+
+            # page.wait(1000)
 
 
 def main():
@@ -119,12 +171,12 @@ def main():
     parser.add_argument("--output", "-o")
 
     args = parser.parse_args()
-    url = "file:///home/joery/Bureaublad/raspiMap/deviant/front-page/index-2026-180.html"
-    url = "http://localhost:8000/Will-You-Marry-Me-849050669"
+    # url = "file:///home/joery/Bureaublad/raspiMap/deviant/front-page/index-2026-180.html"
+    # url = "http://localhost:8000/Will-You-Marry-Me-849050669"
     # scrape_playwright_website()
     # website_url(url)
-    # google_search(args.params)
-    local_searching("")
+    google_search(args.params)
+    # local_searching("")
     print(args)
 
 
