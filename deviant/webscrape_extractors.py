@@ -46,10 +46,8 @@ class ImageExtractor(Extractor):
     def extract(self, input_path, output_path):
         art_links = self.retrieve(input_path)
         # remove duplicates
-        # art_link_paths = list(dict.fromkeys(art_links))
-        art_link_paths = art_links
-        # art_link_paths.sort()
-        # print("len art_link_paths: ", len(art_link_paths))
+        art_link_paths = list(dict.fromkeys(art_links))
+        art_link_paths.sort()
         # print()
         print("art_links are: ")
         links = []
@@ -62,16 +60,7 @@ class ImageExtractor(Extractor):
 
     def retrieve(self, input_path) -> Generator[str]:
         images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
-        # images = list(images)
         # extract src and src_set
-        # sources = (a["src"] for a in images if a.get("src", default=None))
-        # if self._include_srcset:
-        #     sourcesets = (a["srcset"] for a in images if a.get("srcset", default=None))
-        #     # extract all from srcset
-        #     # split at ", " afterward split at a space and take the link part
-        #     sourceset_urls = [x.split(" ")[0].strip() for srcset in sourcesets for x in srcset.split(", ")]
-        #     sources = itertools.chain(sources, sourceset_urls)
-        # sources = itertools.chain(*(self.retrieve_img_src(i) for i in images))
         sources = (src.src for srcs in (self.retrieve_img_src(i) for i in images) for src in srcs)
         art_links_regex = self._regex()
         art_links = (img for img in sources if self._keep_string(art_links_regex, img))
@@ -180,7 +169,7 @@ class PageExtractor(Extractor, ABC):
         hrefs = (str(a["href"]) for a in anchors if a.get("href", default=None))
         art_links_regex = self.extract_regex()
         art_links = (href for href in hrefs if art_links_regex.match(href))
-        return list(art_links)
+        return art_links
 
     @abstractmethod
     def extract_regex(self) -> re.Pattern:
@@ -231,18 +220,18 @@ class DescriptionExtractor(Extractor):
         os.makedirs(output_path, exist_ok=True)
         for input in input_path:
             if not input.exists():
-                print("ERROR input file does not exist")
+                print(f"ERROR {input} file does not exist")
                 continue
             with open(input, "r", encoding=sys.getfilesystemencoding()) as f:
                 soup = BeautifulSoup(f.read(), features="html.parser")
             section = soup.find("div", id="description")
 
             if not section:
-                print("ERROR input file has no description section")
+                print(f"ERROR {input} file has no description section")
                 continue
-            print(section)
+            # print(section)
 
-            output = "\n\n".join(x.get_text() for x in section.find_all(["h1", "h2", "h3", "h4", "h5", "p"]))
+            output = "\n".join(x.get_text() for x in section.find_all(["h1", "h2", "h3", "h4", "h5", "p", "br"]))
             path = output_path / input.name
             with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
                 print(output, file=f)
