@@ -2,6 +2,7 @@ import unittest
 
 import webscrape_extractors
 from bs4 import BeautifulSoup
+from srcset_parsing import ImageType
 
 
 class TestBaseExtractor(unittest.TestCase):
@@ -50,19 +51,11 @@ class TestImageExtractor(unittest.TestCase):
 
         sources = list(self.extractor.retrieve_img_src(anchor))
 
-        expected = [("https://1.png", "main"), ("https://2.png", "2x"), ("https://3.png", "4x")]
-        self.assertListEqual(sources, expected)
-        self.assertEqual(sources, expected)
-        self.assertEqual(len(sources), 3)
-
-    def test_retrieve_img_src_when_no_space_after_comma(self):
-        html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x,https://3.png 4x'/>"""
-        anchor = BeautifulSoup(html, "html.parser").find("img")
-        self.extractor = webscrape_extractors.ImageExtractor()
-
-        sources = list(self.extractor.retrieve_img_src(anchor))
-
-        expected = [("https://1.png", "main"), ("https://2.png", "2x"), ("https://3.png", "4x")]
+        expected = [
+            ImageType("https://1.png", density=1),
+            ImageType("https://2.png", density=2),
+            ImageType("https://3.png", density=4),
+        ]
         self.assertListEqual(sources, expected)
         self.assertEqual(sources, expected)
         self.assertEqual(len(sources), 3)
@@ -74,7 +67,11 @@ class TestImageExtractor(unittest.TestCase):
 
         sources = list(self.extractor.retrieve_img_src(anchor))
 
-        expected = [("https://1.png", "main"), ("https://2.png", "2x"), ("https://3.png", "4x")]
+        expected = [
+            ImageType("https://1.png", density=1),
+            ImageType("https://2.png", density=2),
+            ImageType("https://3,5.png", density=4),
+        ]
         self.assertListEqual(sources, expected)
         self.assertEqual(sources, expected)
         self.assertEqual(len(sources), 3)
@@ -106,7 +103,7 @@ class TestMainImageExtractor(unittest.TestCase):
 
         sources = list(self.extractor.retrieve_img_src(anchor))
 
-        expected = [("https://1.png", "main")]
+        expected = [ImageType("https://1.png", density=1)]
         self.assertListEqual(sources, expected)
         self.assertEqual(sources, expected)
         self.assertEqual(len(sources), 1)

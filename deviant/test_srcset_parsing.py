@@ -47,7 +47,7 @@ class TestSrcSetParsing(unittest.TestCase):
         self.assertListEqual(result, expected)
 
     def test_strict_mode(self):
-        expected = [ImageType("image/x.jpg"), ImageType("images/x-retina.jpg", density=2)]
+        expected = [ImageType("images/x.jpg"), ImageType("images/x-retina.jpg", density=2)]
 
         result = parse_src_set("images/x.jpg, images/x-retina.jpg 2x", strict=True)
         self.assertListEqual(result, expected)
@@ -135,3 +135,40 @@ class TestSrcSetParsing(unittest.TestCase):
                 # no crash in non-strict mode
                 result = stringify_srcset(invalid_array, strict=False)
                 self.assertIsNotNone(result)
+
+
+class TestImageTypeOrdering(unittest.TestCase):
+    def test_neutral(self):
+
+        a = ImageType("a")
+        b = ImageType("b")
+
+        self.assertLess(a, b)
+        self.assertLess(b, a)
+
+    def test_density_is_maximum(self):
+
+        a = ImageType("a", density=1)
+        b = ImageType("b", width=100)
+        c = ImageType("c", width=200)
+
+        maximum = max([a, b, c])
+
+        self.assertIs(maximum, a)
+
+    def test_largest_width(self):
+        a = ImageType("a", width=400)
+        b = ImageType("b", width=100)
+        c = ImageType("c", width=200)
+
+        maximum = max([a, b, c])
+        self.assertIs(maximum, a)
+
+    def test_largest_density(self):
+
+        a = ImageType("a", density=4)
+        b = ImageType("b", density=1)
+        c = ImageType("c", density=2)
+
+        maximum = max([a, b, c])
+        self.assertIs(maximum, a)

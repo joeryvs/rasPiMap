@@ -59,7 +59,7 @@ class ImageExtractor(Extractor):
     def retrieve(self, input_path) -> Generator[str]:
         images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
         # extract src and src_set
-        sources = (src.src for srcs in (self.retrieve_img_src(i) for i in images) for src in srcs)
+        sources = (src.url for srcs in (self.retrieve_img_src(i) for i in images) for src in srcs)
         art_links_regex = self._regex()
         art_links = (img for img in sources if self._keep_string(art_links_regex, img))
         return art_links

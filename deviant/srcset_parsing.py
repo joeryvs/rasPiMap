@@ -13,10 +13,10 @@
 
 # We intentionally implement a loose rule here so that we can perform more aggressive error handling and reporting in the below code.
 # */
+import dataclasses
 import math
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 
 imageCandidateRegex = re.compile(r"\s*([^,]\S*[^,](?:\s+[^,]+)?)\s*(?:,|$)")
 
@@ -27,13 +27,12 @@ class AllDescriptors(defaultdict):
         super().__init__(*args, **kwargs)
 
 
-@dataclass
+@dataclasses.dataclass
 class ImageType:
-    def __init__(self, url, width=None, height=None, density=None) -> None:
-        self.url = url
-        self.width: int | None = width
-        self.height: int | None = height
-        self.density: int | None = density
+    url: str
+    density: int | None = None
+    width: int | None = None
+    height: int | None = None
 
     def __lt__(self, other):
         # rules are inconsistent. assume density is highest
@@ -41,14 +40,14 @@ class ImageType:
             if other.density is not None:
                 return self.density < other.density
             else:
-                return True
+                return False
         if other.density is not None:
-            return False
+            return True
         if self.width is not None:
             if other.width is not None:
                 return self.width < other.width
             else:
-                return True
+                return False
 
         return True
 
