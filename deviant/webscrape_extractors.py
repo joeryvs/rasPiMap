@@ -9,6 +9,7 @@ from collections.abc import Generator
 from typing import Iterable
 
 from bs4 import BeautifulSoup
+from srcset_parsing import ImageType, parse_src_set
 
 
 class Extractor(ABC):
@@ -37,9 +38,6 @@ class Extractor(ABC):
         return []
 
 
-ImageTypes = namedtuple("ImageType", ["src", "type"])
-
-
 class ImageExtractor(Extractor):
     _include_srcset = True
 
@@ -66,17 +64,18 @@ class ImageExtractor(Extractor):
         art_links = (img for img in sources if self._keep_string(art_links_regex, img))
         return art_links
 
-    def retrieve_img_src(self, anchor) -> Generator[ImageTypes]:
+    def retrieve_img_src(self, anchor) -> Generator[ImageType]:
         if anchor.get("src"):
-            yield ImageTypes(anchor["src"], "main")
+            yield ImageType(anchor["src"], density=1)
 
         if self._include_srcset:
             srcset = anchor.get("srcset", default=None)
             if srcset:
-                x = srcset.split(", ")
-                for y in x:
-                    z = y.split(" ")
-                    yield ImageTypes(z[0].strip(), z[1].strip())
+                yield from self.parse_sourceset(srcset)
+
+    def parse_sourceset(self, srcset):
+        assert isinstance(srcset, str)
+        return parse_src_set(srcset)
 
     def _find_elements_kwargs(self):
         return {}
@@ -100,7 +99,7 @@ class DeviantArtImageExtractor(ImageExtractor):
 
 class DeviantArtImage2XExtractor(DeviantArtImageExtractor):
     def retrieve_img_src(self, anchor):
-        return (x for x in super().retrieve_img_src(anchor) if x.type == "2x")
+        return (x for x in super().retrieve_img_src(anchor) if x.density == 2)
 
 
 class AllImagesExtractor(DeviantArtImageExtractor):
@@ -125,16 +124,15 @@ class NoCropImageExtractor(DeviantArtImageExtractor):
 
 
 class NoCropImageExtractorLarge(NoCropImageExtractor):
-    _include_srcset = False
+    _include_srcset = True
 
-    # def retrieve_img_src(self, anchor):
-    #     parent = list(super().retrieve_img_src(anchor))
-    #     print(parent)
+    def retrieve_img_src(self, anchor):
+        result = super().retrieve_img_src(anchor)
 
-    #     if res := filter(lambda x: x.type == "2x", parent):
-    #         yield from res
-    #     else:
-    #         yield from parent
+        maximum = max(result, default=None)
+        if maximum:
+            # print(maximum)
+            yield maximum
 
 
 class LargeImageExtractor(DeviantArtImageExtractor):

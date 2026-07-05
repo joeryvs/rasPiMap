@@ -55,6 +55,30 @@ class TestImageExtractor(unittest.TestCase):
         self.assertEqual(sources, expected)
         self.assertEqual(len(sources), 3)
 
+    def test_retrieve_img_src_when_no_space_after_comma(self):
+        html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x,https://3.png 4x'/>"""
+        anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.extractor = webscrape_extractors.ImageExtractor()
+
+        sources = list(self.extractor.retrieve_img_src(anchor))
+
+        expected = [("https://1.png", "main"), ("https://2.png", "2x"), ("https://3.png", "4x")]
+        self.assertListEqual(sources, expected)
+        self.assertEqual(sources, expected)
+        self.assertEqual(len(sources), 3)
+
+    def test_retrieve_img_src_when_url_contains_comma(self):
+        html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3,5.png 4x'/>"""
+        anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.extractor = webscrape_extractors.ImageExtractor()
+
+        sources = list(self.extractor.retrieve_img_src(anchor))
+
+        expected = [("https://1.png", "main"), ("https://2.png", "2x"), ("https://3.png", "4x")]
+        self.assertListEqual(sources, expected)
+        self.assertEqual(sources, expected)
+        self.assertEqual(len(sources), 3)
+
 
 class TestAvatarExtractor(unittest.TestCase):
     def test_regex_matches(self):
