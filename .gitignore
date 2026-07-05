@@ -81,3 +81,6 @@ deviant/Art-Pages/
 *.txt.*
 
 play/temp*/
+
+# dev-proxy
+dev-proxy/devproxy/
