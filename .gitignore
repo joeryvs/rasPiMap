@@ -69,5 +69,15 @@ books/book_folder/
 !lorem.html
 books/art*-*/
 books/test1/*
+books/test-*-*/
+books/test-*-*-backup/
 books/img-*-*/
+books/pages-*/
+deviant/Art-Pages/
 !requirements.txt
+
+*.png
+*.png.*
+*.txt.*
+
+play/temp*/

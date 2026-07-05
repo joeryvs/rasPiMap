@@ -1,0 +1,16 @@
+FROM nginx:alpine
+
+ENV CERT_FILE localhost.crt
+ENV KEY_FILE localhost.key
+
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY entrypoint.sh /entrypoint.sh
+
+RUN apk add --no-cache openssl
+RUN mkdir /etc/nginx/certs
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/nginx/certs/$KEY_FILE \
+  -out /etc/nginx/certs/$CERT_FILE \
+  -subj "/CN=localhost"
+
+ENTRYPOINT ["/entrypoint.sh"]
