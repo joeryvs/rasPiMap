@@ -21,10 +21,97 @@ from collections import defaultdict
 imageCandidateRegex = re.compile(r"\s*([^,]\S*[^,](?:\s+[^,]+)?)\s*(?:,|$)")
 
 
-class AllDescriptors(defaultdict):
+class LaxDescriptorChecker:
+    def duplicate_descriptor_check(self, value, postfix):
+        pass
+
+    def fallback_descriptor_duplicate_check(self):
+        pass
+
+    def descriptor_count_check(self, currentDescriptors):
+        pass
+
+    def valid_descriptor_check(self, value, postfix, descriptor):
+        pass
+
+    def parse_int(self, string):
+        try:
+            return int(string)
+        except ValueError:
+            return None
+
+
+class StrictDescriptorChecker(LaxDescriptorChecker):
     def __init__(self, *args, **kwargs):
         self.fallback = False
+        self.dict = defaultdict(dict)
         super().__init__(*args, **kwargs)
+
+    def duplicate_descriptor_check(self, value, postfix):
+        if self.dict[postfix].get(value):
+            raise Exception(f"No more than one image candidate is allowed for a given descriptor: {value}{postfix}")
+        self.dict[postfix][value] = True
+
+    def fallback_descriptor_duplicate_check(self):
+        if self.fallback:
+            raise Exception("Only one fallback image candidate is allowed")
+
+        if self.dict.get("x") and 1 in self.dict["x"]:
+            raise Exception("A fallback image is equivalent to a 1x descriptor, providing both is invalid.")
+
+        self.fallback = True
+
+    def descriptor_count_check(self, currentDescriptors):
+        if len(currentDescriptors) == 0:
+            self.fallback_descriptor_duplicate_check()
+        elif len(currentDescriptors) > 1:
+            raise Exception(
+                f"Image candidate may have no more than one descriptor, found {len(currentDescriptors)}: {' '.join(map(repr, currentDescriptors))}"
+            )
+
+    def valid_descriptor_check(self, value, postfix, descriptor):
+        if math.isnan(value):
+            raise Exception(f"{descriptor or value} is not a valid number")
+
+        match postfix:
+            case "w":
+                # Check that the descriptor (minus the 'w') consists only of ASCII digits
+                widthString = descriptor[:-1]
+                regex = re.compile(r"^\d+$")
+                if not regex.match(widthString):
+                    raise TypeError(f"Width descriptor must be a valid non-negative integer: {descriptor}")
+
+                if value <= 0:
+                    raise Exception("Width descriptor must be greater than zero")
+                elif not isinstance(value, (float, int)):
+                    raise TypeError("Width descriptor must be an integer")
+
+            case "x":
+                # Check that the descriptor (minus the 'x') is a valid floating-point number per HTML spec
+                densityString = descriptor[:-1]
+
+                # HTML spec: valid floating-point number cannot be Infinity or NaN
+                if math.isinf(value):
+                    raise TypeError(f"Density descriptor must be a valid floating-point number: {descriptor}")
+
+                # Validate the string format follows HTML floating-point number rules
+                # Must be: optional sign, then either (digits + optional decimal + digits) or (decimal + digits), then optional exponent
+                regex = re.compile(r"^-?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$")
+                if not regex.match(densityString):
+                    raise Exception(f"Density descriptor must be a valid floating-point number: {descriptor}")
+
+                if value <= 0:
+                    raise Exception("Pixel density descriptor must be greater than zero")
+
+            case "h":
+                raise Exception("Height descriptor is no longer allowed")
+
+            case _:
+                raise Exception(f"Invalid srcset descriptor: {descriptor}")
+
+    def parse_int(self, string):
+        """Parse the integer without catching an exception"""
+        return int(string)
 
 
 @dataclasses.dataclass
@@ -52,93 +139,23 @@ class ImageType:
         return True
 
 
-def duplicate_descriptor_check(allDescriptors, value, postfix):
-    if allDescriptors[postfix].get(value):
-        raise Exception(f"No more than one image candidate is allowed for a given descriptor: {value}{postfix}")
-    allDescriptors[postfix][value] = True
-
-
-def fallback_descriptor_duplicate_check(allDescriptors):
-    if allDescriptors.fallback:
-        raise Exception("Only one fallback image candidate is allowed")
-
-    if allDescriptors.get("x") and 1 in allDescriptors["x"]:
-        raise Exception("A fallback image is equivalent to a 1x descriptor, providing both is invalid.")
-
-    allDescriptors.fallback = True
-
-
-def descriptor_count_check(allDescriptors, currentDescriptors):
-    if len(currentDescriptors) == 0:
-        fallback_descriptor_duplicate_check(allDescriptors)
-    elif len(currentDescriptors) > 1:
-        raise Exception(
-            f"Image candidate may have no more than one descriptor, found {len(currentDescriptors)}: {' '.join(map(repr, currentDescriptors))}"
-        )
-
-
-def valid_descriptor_check(value, postfix, descriptor):
-    if math.isnan(value):
-        raise Exception(f"{descriptor or value} is not a valid number")
-
-    match postfix:
-        case "w":
-            # Check that the descriptor (minus the 'w') consists only of ASCII digits
-            widthString = descriptor[:-1]
-            regex = re.compile(r"^\d+$")
-            if not regex.match(widthString):
-                raise TypeError(f"Width descriptor must be a valid non-negative integer: {descriptor}")
-
-            if value <= 0:
-                raise Exception("Width descriptor must be greater than zero")
-            elif not isinstance(value, (float, int)):
-                raise TypeError("Width descriptor must be an integer")
-
-        case "x":
-            # Check that the descriptor (minus the 'x') is a valid floating-point number per HTML spec
-            densityString = descriptor[:-1]
-
-            # HTML spec: valid floating-point number cannot be Infinity or NaN
-            if math.isinf(value):
-                raise TypeError(f"Density descriptor must be a valid floating-point number: {descriptor}")
-
-            # Validate the string format follows HTML floating-point number rules
-            # Must be: optional sign, then either (digits + optional decimal + digits) or (decimal + digits), then optional exponent
-            regex = re.compile(r"^-?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$")
-            if not regex.match(densityString):
-                raise Exception(f"Density descriptor must be a valid floating-point number: {descriptor}")
-
-            if value <= 0:
-                raise Exception("Pixel density descriptor must be greater than zero")
-
-        case "h":
-            raise Exception("Height descriptor is no longer allowed")
-
-        case _:
-            raise Exception(f"Invalid srcset descriptor: {descriptor}")
-
-
 def parse_src_set(string: str, strict=False):
-    allDescriptors = AllDescriptors(dict)
+    checker = StrictDescriptorChecker() if strict else LaxDescriptorChecker()
 
     def foo(part: str):
         parts = part.strip().split()
         url, *descriptors = parts
         result = ImageType(url)
-        if strict:
-            descriptor_count_check(allDescriptors, descriptors)
+
+        checker.descriptor_count_check(descriptors)
 
         for descriptor in descriptors:
             postfix = descriptor[-1]
-            try:
-                value = int(descriptor[:-1])
-            except ValueError:
-                if strict:
-                    raise
-                value = None
-            if strict:
-                valid_descriptor_check(value=value, descriptor=descriptor, postfix=postfix)
-                duplicate_descriptor_check(allDescriptors=allDescriptors, value=value, postfix=postfix)
+
+            value = checker.parse_int(descriptor[:-1])
+
+            checker.valid_descriptor_check(value=value, descriptor=descriptor, postfix=postfix)
+            checker.duplicate_descriptor_check(value=value, postfix=postfix)
 
             if postfix == "w":
                 result.width = value
@@ -161,7 +178,7 @@ knownDescriptors = {"width": "w", "height": "h", "density": "x"}
 
 
 def stringify_srcset(array, strict=False):
-    allDescriptors = AllDescriptors(dict)
+    checker = StrictDescriptorChecker() if strict else LaxDescriptorChecker()
 
     def foo(element):
         if not hasattr(element, "url"):
@@ -170,8 +187,7 @@ def stringify_srcset(array, strict=False):
             return ""
         descriptorKeys = [k for k, v in knownDescriptors.items() if getattr(element, k)]
 
-        if strict:
-            descriptor_count_check(allDescriptors, descriptorKeys)
+        checker.descriptor_count_check(descriptorKeys)
 
         res = [getattr(element, "url")]
 
@@ -180,9 +196,8 @@ def stringify_srcset(array, strict=False):
             value = getattr(element, descriptorKey)
 
             descriptor = f"{value}{postfix}"
-            if strict:
-                valid_descriptor_check(value, postfix, descriptor)
-                duplicate_descriptor_check(allDescriptors, value, postfix)
+            checker.valid_descriptor_check(value, postfix, descriptor)
+            checker.duplicate_descriptor_check(value, postfix)
 
             res.append(descriptor)
 
