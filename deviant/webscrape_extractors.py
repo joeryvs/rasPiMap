@@ -4,7 +4,6 @@ import pathlib
 import re
 import sys
 from abc import ABC, abstractmethod
-from collections import namedtuple
 from collections.abc import Generator
 from typing import Iterable
 
@@ -50,7 +49,7 @@ class ImageExtractor(Extractor):
         print("art_links are: ")
         links = []
         # print(*art_link_paths, sep="\n")
-        with open(output_path, "a") as f:
+        with open(output_path, "w") as f:
             for p in art_link_paths:
                 links.append(p)
                 print(p, file=f)
