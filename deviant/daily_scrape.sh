@@ -25,7 +25,7 @@ fi
 mkdir -p $today_map
 curl https://www.deviantart.com/ -o "$today_index"
 # call python script
-python webscrape_dev.py images2x -i "$today_index" -o "$today_art_links"
+python webscrape_dev.py no_crop_large -i "$today_index" -o "$today_art_links"
 # sort and unique
 sort "$today_art_links" --unique -o "$today_art_links"
 # Download all images

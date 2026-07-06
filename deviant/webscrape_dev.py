@@ -6,8 +6,6 @@ from webscrape_extractors import ExtractorFactory
 
 
 def main():
-    path = pathlib.Path(__file__).parent / "index.html"
-    output = pathlib.Path(__file__).parent / "art_links.txt"
 
     factory = ExtractorFactory()
     parser = argparse.ArgumentParser(
@@ -17,8 +15,8 @@ def main():
     )
 
     parser.add_argument("type", choices=factory.choices)
-    parser.add_argument("-i", "--input", default=path, nargs="+")
-    parser.add_argument("-o", "--output", default=output, nargs="?")
+    parser.add_argument("-i", "--input", nargs="+")
+    parser.add_argument("-o", "--output")
 
     args = parser.parse_args()
     print(args.type)
