@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 
-from webscrape_extractors import ExtractorFactory
+from webscrape_extractors import ExtractorFactory, FileWriter, Reader, StdoutWriter
 
 
 def main():
@@ -16,14 +16,16 @@ def main():
 
     parser.add_argument("type", choices=factory.choices)
     parser.add_argument("-i", "--input", nargs="+")
-    parser.add_argument("-o", "--output")
+    parser.add_argument("-o", "--output", default="-")
 
     args = parser.parse_args()
     print(args.type)
     print(args.input)
     print(args.output)
 
-    extractor_object = factory.extractor(args.type)
+    reader = Reader()
+    writer = StdoutWriter() if args.output == "-" else FileWriter(args.output)
+    extractor_object = factory.extractor(args.type, reader, writer)
     if extractor_object:
         extractor_object.extract(args.input, args.output)
 

@@ -1,25 +1,27 @@
 #!../venv/bin/python
+import json
 import os
 import pathlib
 import re
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Generator
+from random import sample
 from typing import Iterable
 
 from bs4 import BeautifulSoup
+from markdownify import markdownify as md
 from srcset_parsing import ImageType, parse_src_set
 
 
-class Extractor(ABC):
-    @classmethod
-    def find_elements(cls, path, elm_name, **kwargs):
+class Reader:
+    def find_elements(self, path, elm_name, **kwargs):
         if not isinstance(path, Iterable):
             path = [path]
         for p in path:
             p = pathlib.Path(p)
             if p.is_dir():
-                yield from cls.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
+                yield from self.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
             elif p.is_file():
                 with open(p, "r") as f:
                     data = f.read()
@@ -27,6 +29,56 @@ class Extractor(ABC):
                 yield from soup.find_all(name=elm_name, **kwargs)
             else:
                 print("ERROR ARGUMENT IS NOT A FILE")
+
+
+class Writer(ABC):
+    @abstractmethod
+    def output_items(self, items):
+        pass
+
+    @abstractmethod
+    def output_content_to_directory(self, name, content):
+        pass
+
+
+class StdoutWriter(Writer):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def output_items(self, items):
+        for p in items:
+            print(p)
+
+    def output_content_to_directory(self, name, content):
+        print("##", name)
+        print(content)
+        return super().output_content_to_directory(name, content)
+
+
+class FileWriter(Writer):
+    def __init__(self, output) -> None:
+        self.output_file = pathlib.Path(output)
+        super().__init__()
+
+    def output_items(self, items):
+
+        with open(self.output_file, "w") as f:
+            for i in items:
+                print(i, file=f)
+
+    def output_content_to_directory(self, name, content):
+        path = self.output_file / name
+        with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
+            print(content, file=f)
+
+
+class Extractor(ABC):
+    def __init__(self, reader: Reader, writer: Writer):
+        self.reader = reader
+        self.writer = writer
+
+    def find_elements(self, path, elm_name, **kwargs):
+        return self.reader.find_elements(path, elm_name, **kwargs)
 
     @abstractmethod
     def extract(self, input_path, output_path):
@@ -47,13 +99,11 @@ class ImageExtractor(Extractor):
         art_link_paths.sort()
         # print()
         print("art_links are: ")
-        links = []
-        # print(*art_link_paths, sep="\n")
-        with open(output_path, "w") as f:
-            for p in art_link_paths:
-                links.append(p)
-                print(p, file=f)
-            # print(*art_link_paths, sep="\n", file=f)
+
+        self.writer.output_items(art_link_paths)
+        # with open(output_path, "w") as f:
+        #     for p in art_link_paths:
+        #         print(p, file=f)
 
     def retrieve(self, input_path) -> Generator[str]:
         images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
@@ -157,9 +207,10 @@ class PageExtractor(Extractor, ABC):
         art_link_paths.sort()
         print()
         print("new page links are: ")
-        print(*art_link_paths, sep="\n")
-        with open(output_path, "a") as f:
-            print(*art_link_paths, sep="\n", file=f)
+        self.writer.output_items(art_link_paths)
+        # print(*art_link_paths, sep="\n")
+        # with open(output_path, "a") as f:
+        #     print(*art_link_paths, sep="\n", file=f)
 
     def retrieve(self, input_path):
         anchors = self.find_elements(input_path, "a")
@@ -227,42 +278,88 @@ class DescriptionExtractor(Extractor):
                 print(f"ERROR {input} file has no description section")
                 continue
             # print(section)
-
-            output = "\n".join(x.get_text() for x in section.find_all(["h1", "h2", "h3", "h4", "h5", "p", "br"]))
-            path = output_path / input.name
-            with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
-                print(output, file=f)
+            output = md(str(section))
+            self.writer.output_content_to_directory(input.name, output)
+            # path = output_path / input.name
+            # with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
+            #     print(output, file=f)
 
     def retrieve(self, input_path):
         return super().retrieve(input_path)
 
 
 class JsonExtractor(Extractor):
-    def retrieve(self, input_path) -> Iterable:
-        a = self.find_elements(input_path, "script")
+    def extract(self, input_path, output_path):
+        a = self.find_elements(input_path, "script", id="_R_")
+        all_urls = []
         for b in a:
             # print(b)
             text = b.text
-            # if b.is_empty_element:
-            # print("empty")
-            # continue
-            # print(dir(b))
-            # print(text)
-            regex = re.compile(r"baseUri")
-            if "baseUri" in text:
-                print(text)
-            if x := regex.match(text):
-                print(text)
-                print()
-                print(x)
+            lines = text.split("\n")
+            important: str = lines[3]
+            # print(*enumerate(lines))
+            # print(important)
+            # make a lot of assumption no of the structure
+            important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
 
-                input()
-        return super().retrieve(input_path)
+            # kinda dangeroues to run arbartraty code,
+            important = eval(important, {}, {})
+            # print(type(y))
+            x = json.loads(important)
+            print(x)
 
-    def extract(self, input_path, output_path):
+            medias = self.find_props(x, "media")
+            # print(len(medias))
+            print(medias[0])
 
-        scripts = self.retrieve(input_path=input_path)
-        return super().extract(input_path, output_path)
+            urls = [self.construct_url_from_media(media) for media in medias]
+            print(*urls, sep="\n")
+            all_urls.extend(urls)
+
+        self.writer.output_items(all_urls)
+
+    def find_props(self, dictionary, prop):
+        result = []
+
+        def find_prop_rec(obj):
+            if not obj:
+                return
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k == prop:
+                        result.append(v)
+                    else:
+                        find_prop_rec(v)
+            if isinstance(obj, list):
+                for item in obj:
+                    find_prop_rec(item)
+            pass
+
+        find_prop_rec(dictionary)
+        return result
+
+    def construct_url_from_media(self, media):
+        baseUri = media.get("baseUri")
+        prettyName = media.get("prettyName")
+        tokens = media.get("token")
+        token = "?token=" + tokens[0] if tokens else ""
+        types: list[dict] = media.get("types")
+
+        # t is fullview or pre or social_preview
+        # find first fullview, then preview and social_preview as backups
+        fullviews = [t for x in ["fullview", "preview", "social_preview"] for t in types if t.get("t") == x]
+        print(fullviews)
+        if fullviews:
+            fullview = fullviews[0]
+            c = fullview.get("c") or ""
+            extension = c.replace("<prettyName>", prettyName)
+            url = baseUri + extension + token
+            return url
+        return ""
+
+    def retrieve(self, input_path, output_path):
+
+        pass
 
 
 class ExtractorFactory:

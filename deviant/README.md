@@ -32,3 +32,25 @@ for each use **url** to get the full url which links to **yt3.ggpht.com**
 THe post Data consist of *body*
 
 need more debug info
+
+## Taking from source
+
+when downloading an individual page, of front-page image or other. you usually get a bunch of JS
+
+find the script with the id of *_R_*, that sets SEVERAL fields on window, the most important ones are 
+*__INITIAL_I18N__* which deals with translation and *__INITIAL_STATE__* which deals with all the state required 
+for efficient use of a progressive web-app.
+
+in the *__INITIAL_STATE__* variable taks *@@entities* en then *deviantion* and you get a JS object for which the keys are string-numbers and the values 
+are objects with several fields.  The most important one is *media*, 
+which contains the fields *baseUri*, *prettyName*, *token* and *types*
+
+*baseUri* and *prettyName* are both strings, *token* is a list of strings.  
+*types* is an array of objects where each object has a *t*, *r*, *c*, *h*, *w* field with an optional *ss* field which is an array of objects.  
+one of the *types* should have {'t':'fullview'} and that item can be used to construct the full image url.
+
+with the rough formula
+
+```js
+const url = baseUri + (types.find(x => x.t == "fullview")?.c ?? "").replace("<prettyName>",prettyName) + "?token=" + token[0]
+```

@@ -49,11 +49,12 @@ while [[ $# != 0 ]];do
     # sort and unique
     sort "$today_tag_art_links" --unique -o "$today_tag_art_links"
     # Download all images
-    wget --wait=0.2 --random-wait --input-file="$today_tag_art_links" --directory-prefix="$today_tag_map" --quiet
+    wget --input-file="$today_tag_art_links" --directory-prefix="$today_tag_map" --quiet
 
     pwd
     # clean
     ../remove_post.sh "$today_tag_map"
+    sleep 3
 
 done;
 exit 0
