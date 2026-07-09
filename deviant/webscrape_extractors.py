@@ -207,6 +207,7 @@ class PageExtractor(Extractor, ABC):
         art_link_paths.sort()
         print()
         print("new page links are: ")
+        print(len(art_link_paths))
         self.writer.output_items(art_link_paths)
         # print(*art_link_paths, sep="\n")
         # with open(output_path, "a") as f:
@@ -280,9 +281,6 @@ class DescriptionExtractor(Extractor):
             # print(section)
             output = md(str(section))
             self.writer.output_content_to_directory(input.name, output)
-            # path = output_path / input.name
-            # with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
-            #     print(output, file=f)
 
     def retrieve(self, input_path):
         return super().retrieve(input_path)
@@ -290,32 +288,8 @@ class DescriptionExtractor(Extractor):
 
 class JsonExtractor(Extractor):
     def extract(self, input_path, output_path):
-        a = self.find_elements(input_path, "script", id="_R_")
-        all_urls = []
-        for b in a:
-            # print(b)
-            text = b.text
-            lines = text.split("\n")
-            important: str = lines[3]
-            # print(*enumerate(lines))
-            # print(important)
-            # make a lot of assumption no of the structure
-            important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
-
-            # kinda dangeroues to run arbartraty code,
-            important = eval(important, {}, {})
-            # print(type(y))
-            x = json.loads(important)
-            print(x)
-
-            medias = self.find_props(x, "media")
-            # print(len(medias))
-            print(medias[0])
-
-            urls = [self.construct_url_from_media(media) for media in medias]
-            print(*urls, sep="\n")
-            all_urls.extend(urls)
-
+        all_urls = self.retrieve(input_path=input_path)
+        all_urls = sorted(dict.fromkeys(all_urls))
         self.writer.output_items(all_urls)
 
     def find_props(self, dictionary, prop):
@@ -357,8 +331,24 @@ class JsonExtractor(Extractor):
             return url
         return ""
 
-    def retrieve(self, input_path, output_path):
-
+    def retrieve(self, input_path):
+        a = self.find_elements(input_path, "script", id="_R_")
+        for b in a:
+            text = b.text
+            print(text)
+            lines = text.split("\n")
+            important: str = lines[3]
+            # make a lot of assumption no of the structure
+            important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
+            # kinda dangeroues to run arbartraty code,
+            important = eval(important, {}, {})
+            x = json.loads(important)
+            print(x)
+            # find all "media"
+            medias = self.find_props(x, "media")
+            # construct url
+            urls = [self.construct_url_from_media(media) for media in medias]
+            yield from urls
         pass
 
 
