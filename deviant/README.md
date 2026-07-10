@@ -20,7 +20,9 @@ inside a new directory run `wget --content-disposittion -i ../art_links.txt` to 
 Use the following options `--user-agent=Mozilla --random-wait`
 
 ## Rename
-in the root of the directory is a file for which to rename all images to their hash
+in the root of the directory is a file **rename_all.sh** for which to rename all images to their hash.
+
+but you should use **remove_post.sh** to rename the files. without the query parameters
 ## Youtube
 
 perform a POST request to **https://youtube.com/youtubei/v1/browse?prettyPrint=false**

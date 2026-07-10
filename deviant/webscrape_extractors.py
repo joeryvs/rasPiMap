@@ -6,7 +6,6 @@ import re
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from random import sample
 from typing import Iterable
 
 from bs4 import BeautifulSoup
@@ -251,8 +250,7 @@ class TagPageExtractor(PageExtractor):
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/tag/.*$")
 
-
-class DescriptionExtractor(Extractor):
+class OnePerPageExtractor(Extractor,ABC):
     def extract(self, input_path, output_path):
         if not isinstance(input_path, list):
             input_path = [input_path]
@@ -273,20 +271,106 @@ class DescriptionExtractor(Extractor):
                 continue
             with open(input, "r", encoding=sys.getfilesystemencoding()) as f:
                 soup = BeautifulSoup(f.read(), features="html.parser")
-            section = soup.find("div", id="description")
 
-            if not section:
-                print(f"ERROR {input} file has no description section")
-                continue
-            # print(section)
-            output = md(str(section))
-            self.writer.output_content_to_directory(input.name, output)
+            self.handle_page(input,soup)
 
+    @abstractmethod
+    def handle_page(self,name,soup):
+        pass
+    def retrieve(self, input_path):
+        return super().retrieve(input_path)
+
+
+class DescriptionExtractor(OnePerPageExtractor):
+    def handle_page(self, name, soup):
+        section = soup.find("div", id="description")
+
+        if not section:
+            print(f"ERROR {input} file has no description section")
+            return
+        # print(section)
+        output = md(str(section))
+        self.writer.output_content_to_directory(name.with_suffix(".md").name, output)
+        return super().handle_page(name, soup)
+
+    def retrieve(self, input_path):
+        return super().retrieve(input_path)
+
+class StoryExtractor(OnePerPageExtractor):
+
+
+    def handle_page(self, name, soup):
+
+        section = soup.find("section",class_="HiQtsh")
+
+        if not section:
+            print(f"ERROR {name} file has no section")
+            return
+        output = md(str(section))
+        self.writer.output_content_to_directory(name.with_suffix(".md").name,output)
+        return super().handle_page(name, soup)
     def retrieve(self, input_path):
         return super().retrieve(input_path)
 
 
 class JsonExtractor(Extractor):
+    def extract(self, input_path, output_path):
+        if not isinstance(input_path, list):
+            input_path = [input_path]
+        input_path = [
+            y
+            for i in input_path
+            for ys in [
+                [pathlib.Path(i) / z for z in os.listdir(i)] if pathlib.Path(i).is_dir() else [pathlib.Path(i)]
+            ]
+            for y in ys
+            if y.is_file()
+        ]
+        if isinstance(output_path, str):
+            output_path = pathlib.Path(output_path)
+        os.makedirs(output_path, exist_ok=True)
+        for input in input_path:
+            if not input.exists():
+                print(f"ERROR {input} file does not exist")
+                continue
+            with open(input, "r", encoding=sys.getfilesystemencoding()) as f:
+                soup = BeautifulSoup(f.read(), features="html.parser")
+            # section = soup.find("div", id="description")
+            script = soup.find("script", id="_R_")
+            if not script:
+                print(f"ERROR {input} file has no _R_ script section")
+                continue
+            text = script.text
+            print(text)
+            lines = text.split("\n")
+            important: str = lines[3]
+            # make a lot of assumption no of the structure
+            important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
+            # kinda dangeroues to run arbartraty code,
+
+            important = eval(important, {}, {})
+            # parse to obj and back to string
+            try:
+                json_content = json.loads(important)
+                output = json.dumps(
+                    json_content,
+                    check_circular=True,
+                    allow_nan=False,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    indent=2,
+                )
+            except json.decoder.JSONDecodeError:
+                print(f"ERROR {input} has an imparseble json content")
+                output = important
+            name = input.with_suffix(".json").name
+            self.writer.output_content_to_directory(name, output)
+
+    def retrieve(self, input_path) -> Iterable:
+        return super().retrieve(input_path)
+
+
+class JsonImageUrlExtractor(Extractor):
     def extract(self, input_path, output_path):
         all_urls = self.retrieve(input_path=input_path)
         all_urls = sorted(dict.fromkeys(all_urls))
@@ -368,7 +452,9 @@ class ExtractorFactory:
             "all_links": AllPagesExtractor,
             "tags": TagPageExtractor,
             "description": DescriptionExtractor,
+            "story": StoryExtractor,
             "json": JsonExtractor,
+            "json_art": JsonImageUrlExtractor,
         }
 
     @property
