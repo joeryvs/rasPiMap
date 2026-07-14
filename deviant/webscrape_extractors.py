@@ -18,6 +18,7 @@ class Reader:
         if not isinstance(path, Iterable):
             path = [path]
         for p in path:
+            print(p)
             p = pathlib.Path(p)
             if p.is_dir():
                 yield from self.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
@@ -91,11 +92,15 @@ class Extractor(ABC):
 class ImageExtractor(Extractor):
     _include_srcset = True
 
-    def extract(self, input_path, output_path):
+    def extract(self, input_path, output_path,sort=True,unique=True):
         art_links = self.retrieve(input_path)
         # remove duplicates
-        art_link_paths = list(dict.fromkeys(art_links))
-        art_link_paths.sort()
+        art_link_paths = art_links
+        if unique:
+            art_link_paths = list(dict.fromkeys(art_links))
+        if sort:
+            art_link_paths = list(art_link_paths)
+            art_link_paths.sort()
         # print()
         print("art_links are: ")
 
@@ -286,7 +291,7 @@ class DescriptionExtractor(OnePerPageExtractor):
         section = soup.find("div", id="description")
 
         if not section:
-            print(f"ERROR {input} file has no description section")
+            print(f"ERROR {name} file has no description section")
             return
         # print(section)
         output = md(str(section))
@@ -297,8 +302,6 @@ class DescriptionExtractor(OnePerPageExtractor):
         return super().retrieve(input_path)
 
 class StoryExtractor(OnePerPageExtractor):
-
-
     def handle_page(self, name, soup):
 
         section = soup.find("section",class_="HiQtsh")
