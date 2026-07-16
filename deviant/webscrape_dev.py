@@ -1,6 +1,6 @@
 #!../venv/bin/python
 import argparse
-import pathlib
+import logging
 
 from webscrape_extractors import ExtractorFactory, FileWriter, Reader, StdoutWriter
 
@@ -15,19 +15,28 @@ def main():
     )
 
     parser.add_argument("type", choices=factory.choices)
-    parser.add_argument("-i", "--input", nargs="+")
-    parser.add_argument("-o", "--output", default="-")
+    parser.add_argument("-i", "--input-path", nargs="+")
+    parser.add_argument("-o", "--output-path", default="-")
+
+    parser.add_argument("--sort", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--unique", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--log-level", choices=list(logging._levelToName.values()), default="INFO")
+
+    parser.add_argument_group()
 
     args = parser.parse_args()
-    print(args.type)
-    print(args.input)
-    print(args.output)
 
+    logging.basicConfig(level=args.log_level)
+    if not args.quiet:
+        for k, v in vars(args).items():
+            print(k, v)
     reader = Reader()
-    writer = StdoutWriter() if args.output == "-" else FileWriter(args.output)
+    writer = StdoutWriter() if args.output_path == "-" else FileWriter(args.output_path)
     extractor_object = factory.extractor(args.type, reader, writer)
     if extractor_object:
-        extractor_object.extract(args.input, args.output)
+        extractor_object.extract(**vars(args))
 
 
 if __name__ == "__main__":

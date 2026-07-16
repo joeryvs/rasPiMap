@@ -1,5 +1,6 @@
 #!../venv/bin/python
 import json
+import logging
 import os
 import pathlib
 import re
@@ -12,13 +13,15 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 from srcset_parsing import ImageType, parse_src_set
 
+_logger = logging.getLogger(__name__)
+
 
 class Reader:
     def find_elements(self, path, elm_name, **kwargs):
         if not isinstance(path, Iterable):
             path = [path]
         for p in path:
-            print(p)
+            _logger.debug("Parsing %s", p)
             p = pathlib.Path(p)
             if p.is_dir():
                 yield from self.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
@@ -68,6 +71,7 @@ class FileWriter(Writer):
 
     def output_content_to_directory(self, name, content):
         path = self.output_file / name
+        os.makedirs(self.output_file, exist_ok=True)
         with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
             print(content, file=f)
 
@@ -81,7 +85,7 @@ class Extractor(ABC):
         return self.reader.find_elements(path, elm_name, **kwargs)
 
     @abstractmethod
-    def extract(self, input_path, output_path):
+    def extract(self, /, input_path, **kwargs):
         pass
 
     @abstractmethod
@@ -92,7 +96,7 @@ class Extractor(ABC):
 class ImageExtractor(Extractor):
     _include_srcset = True
 
-    def extract(self, input_path, output_path,sort=True,unique=True):
+    def extract(self, /, input_path, sort=True, unique=True, **kwargs):
         art_links = self.retrieve(input_path)
         # remove duplicates
         art_link_paths = art_links
@@ -101,13 +105,9 @@ class ImageExtractor(Extractor):
         if sort:
             art_link_paths = list(art_link_paths)
             art_link_paths.sort()
-        # print()
         print("art_links are: ")
 
         self.writer.output_items(art_link_paths)
-        # with open(output_path, "w") as f:
-        #     for p in art_link_paths:
-        #         print(p, file=f)
 
     def retrieve(self, input_path) -> Generator[str]:
         images = self.find_elements(input_path, "img", **self._find_elements_kwargs())
@@ -204,18 +204,20 @@ class LargeImageExtractor(DeviantArtImageExtractor):
 
 
 class PageExtractor(Extractor, ABC):
-    def extract(self, input_path, output_path):
+    def extract(self, /, input_path, sort=True, unique=True, **kwargs):
         art_links = self.retrieve(input_path)
         # remove duplicates
-        art_link_paths = list(dict.fromkeys(map(self.post_proces_function, art_links)))
-        art_link_paths.sort()
-        print()
-        print("new page links are: ")
-        print(len(art_link_paths))
+
+        art_link_paths = map(self.post_proces_function, art_links)
+        if unique:
+            _logger.info("TAking unique items")
+            art_link_paths = list(dict.fromkeys(art_link_paths))
+            _logger.info("new page links are: %d", len(art_link_paths))
+        if sort:
+            _logger.info("sorting items")
+            art_link_paths = sorted(art_link_paths)
+
         self.writer.output_items(art_link_paths)
-        # print(*art_link_paths, sep="\n")
-        # with open(output_path, "a") as f:
-        #     print(*art_link_paths, sep="\n", file=f)
 
     def retrieve(self, input_path):
         anchors = self.find_elements(input_path, "a")
@@ -251,12 +253,32 @@ class UserPageExtractor(PageExtractor):
         return re.compile(r"^.*/gallery.*$")
 
 
+class HighestUserExtractor(UserPageExtractor):
+    def extract(self, /, input_path, **kwargs):
+        assert len(input_path) == 1
+
+        art_links = self.retrieve(input_path=input_path)
+        art_link_paths = map(self.post_proces_function, art_links)
+        art_link_paths = list(art_link_paths)
+        _logger.debug("total links in %s are %d", input_path, len(art_link_paths))
+        regex = re.compile(r"page=(\d+)")
+        regexes = map(regex.search, art_link_paths)
+        # extract the numbers of the matches
+        numbers = [int(x.group(1)) for x in regexes if x]
+        highest = max(numbers, default=None)
+        if highest is not None:
+            self.writer.output_items([highest])
+        else:
+            _logger.error("No page found at %s", input_path)
+
+
 class TagPageExtractor(PageExtractor):
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/tag/.*$")
 
-class OnePerPageExtractor(Extractor,ABC):
-    def extract(self, input_path, output_path):
+
+class OnePerPageExtractor(Extractor, ABC):
+    def extract(self, input_path, /, **kwargs):
         if not isinstance(input_path, list):
             input_path = [input_path]
 
@@ -267,21 +289,19 @@ class OnePerPageExtractor(Extractor,ABC):
             for y in ys
             if y.is_file()
         ]
-        if isinstance(output_path, str):
-            output_path = pathlib.Path(output_path)
-        os.makedirs(output_path, exist_ok=True)
         for input in input_path:
             if not input.exists():
-                print(f"ERROR {input} file does not exist")
+                _logger.error("ERROR %s file does not exist", input)
                 continue
             with open(input, "r", encoding=sys.getfilesystemencoding()) as f:
                 soup = BeautifulSoup(f.read(), features="html.parser")
 
-            self.handle_page(input,soup)
+            self.handle_page(input, soup)
 
     @abstractmethod
-    def handle_page(self,name,soup):
+    def handle_page(self, name, soup):
         pass
+
     def retrieve(self, input_path):
         return super().retrieve(input_path)
 
@@ -301,47 +321,44 @@ class DescriptionExtractor(OnePerPageExtractor):
     def retrieve(self, input_path):
         return super().retrieve(input_path)
 
+
 class StoryExtractor(OnePerPageExtractor):
     def handle_page(self, name, soup):
 
-        section = soup.find("section",class_="HiQtsh")
+        section = soup.find("section", class_="HiQtsh")
 
         if not section:
             print(f"ERROR {name} file has no section")
             return
         output = md(str(section))
-        self.writer.output_content_to_directory(name.with_suffix(".md").name,output)
+        self.writer.output_content_to_directory(name.with_suffix(".md").name, output)
         return super().handle_page(name, soup)
+
     def retrieve(self, input_path):
         return super().retrieve(input_path)
 
 
 class JsonExtractor(Extractor):
-    def extract(self, input_path, output_path):
+    def extract(self, input_path, /, **kwargs):
         if not isinstance(input_path, list):
             input_path = [input_path]
         input_path = [
             y
             for i in input_path
-            for ys in [
-                [pathlib.Path(i) / z for z in os.listdir(i)] if pathlib.Path(i).is_dir() else [pathlib.Path(i)]
-            ]
+            for ys in [[pathlib.Path(i) / z for z in os.listdir(i)] if pathlib.Path(i).is_dir() else [pathlib.Path(i)]]
             for y in ys
             if y.is_file()
         ]
-        if isinstance(output_path, str):
-            output_path = pathlib.Path(output_path)
-        os.makedirs(output_path, exist_ok=True)
         for input in input_path:
             if not input.exists():
-                print(f"ERROR {input} file does not exist")
+                _logger.error("ERROR %s file does not exist", input)
                 continue
             with open(input, "r", encoding=sys.getfilesystemencoding()) as f:
                 soup = BeautifulSoup(f.read(), features="html.parser")
             # section = soup.find("div", id="description")
             script = soup.find("script", id="_R_")
             if not script:
-                print(f"ERROR {input} file has no _R_ script section")
+                _logger.error("ERROR %s file has no _R_ script section", input)
                 continue
             text = script.text
             print(text)
@@ -452,6 +469,7 @@ class ExtractorFactory:
             "main_image": MainImageExtractor,
             "avatar": AvatarExtractor,
             "users": UserPageExtractor,
+            "highest_user_page_number": HighestUserExtractor,
             "all_links": AllPagesExtractor,
             "tags": TagPageExtractor,
             "description": DescriptionExtractor,
