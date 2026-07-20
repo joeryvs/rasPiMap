@@ -1,7 +1,7 @@
 import json
 import logging
 
-from ..utils import Extractor
+from utils import Extractor
 
 _logger = logging.getLogger(__name__)
 

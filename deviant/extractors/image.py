@@ -2,8 +2,8 @@ import logging
 import re
 from collections.abc import Generator
 
-from ..srcset_parsing import ImageType, parse_src_set
-from ..utils import Extractor
+from srcset_parsing import ImageType, parse_src_set
+from utils import Extractor
 
 _logger = logging.getLogger(__name__)
 

@@ -1,19 +1,7 @@
 #!../venv/bin/python
 import logging
 
-# from deviant.extractors.art_page import ArtPageExtractor
-# from deviant.extractors.avatar import AvatarExtractor
-# from deviant.extractors.description import DescriptionExtractor
-# from deviant.extractors.deviant_art_image import AllImagesExtractor, DeviantArtImage2XExtractor, DeviantArtImageExtractor, LargeImageExtractor
-# from deviant.extractors.highest_user import HighestUserExtractor
-# from deviant.extractors.json import JsonExtractor
-# from deviant.extractors.json_image import JsonImageUrlExtractor
-# from deviant.extractors.main_image import MainImageExtractor
-# from deviant.extractors.no_crop_image import NoCropImageExtractor, NoCropImageExtractorLarge
-# from deviant.extractors.page import AllPagesExtractor, ArtPageExtractor, TagPageExtractor, UserPageExtractor
-# from deviant.extractors.story import StoryExtractor
-# from deviant.utils import Extractor
-from .extractors import (
+from extractors import (
     AllImagesExtractor,
     AllPagesExtractor,
     ArtPageExtractor,
@@ -22,15 +10,20 @@ from .extractors import (
     DeviantArtImage2XExtractor,
     DeviantArtImageExtractor,
     HighestUserExtractor,
+    ImageExtractor,
+    JsonExtractor,
     JsonImageUrlExtractor,
     LargeImageExtractor,
     MainImageExtractor,
     NoCropImageExtractor,
     NoCropImageExtractorLarge,
+    OnePerPageExtractor,
+    PageExtractor,
     StoryExtractor,
     TagPageExtractor,
     UserPageExtractor,
 )
+from utils import Extractor
 
 _logger = logging.getLogger(__name__)
 

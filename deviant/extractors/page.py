@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import logging
 import re
 
-from deviant.utils import Extractor
+from utils import Extractor
 
 _logger = logging.getLogger(__name__)
 

@@ -2,20 +2,18 @@
 import argparse
 import logging
 
-from deviant.factory import ExtractorFactory
-from deviant.utils import FileWriter, Reader, StdoutWriter
+from factory import ExtractorFactory
+from utils import FileWriter, Reader, StdoutWriter
 
 
-def main():
-
-    factory = ExtractorFactory()
+def get_arguments(choices: list[str]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="webscrape_dev",
         description="Choose mode and other options",
         epilog="hello world",
     )
 
-    parser.add_argument("type", choices=factory.choices)
+    parser.add_argument("type", choices=choices)
     parser.add_argument("-i", "--input-path", nargs="+")
     parser.add_argument("-o", "--output-path", default="-")
 
@@ -27,6 +25,14 @@ def main():
 
     parser.add_argument_group()
 
+    return parser
+
+
+def main():
+
+    factory = ExtractorFactory()
+
+    parser = get_arguments(factory.choices)
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level)

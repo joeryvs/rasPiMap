@@ -1,7 +1,7 @@
 import logging
 from markdownify import markdownify as md
 
-from .one_per_page import OnePerPageExtractor
+from extractors.one_per_page import OnePerPageExtractor
 
 _logger = logging.getLogger(__name__)
 

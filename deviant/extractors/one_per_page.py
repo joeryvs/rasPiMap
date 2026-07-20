@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 from bs4 import BeautifulSoup
 
-from deviant.utils import Extractor
+from utils import Extractor
 
 _logger = logging.getLogger(__name__)
 
