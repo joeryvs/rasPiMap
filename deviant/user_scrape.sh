@@ -7,9 +7,13 @@ if [[ ! -n $(echo "$VIRTUAL_ENV") ]] ; then
     exit 1
 fi
 
+if [[ $# != 1 ]] ; then
+    echo "GIVE 1 argument"
+    exit 1;
+fi
 
 # CHANGE constants on next run
-user="ivatent"
+user="$1"
 ART_PAGE_URL=""$user"_pages.txt"
 
 if [[ ! -r $ART_PAGE_URL ]]; then

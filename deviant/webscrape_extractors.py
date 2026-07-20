@@ -21,17 +21,18 @@ class Reader:
         if not isinstance(path, Iterable):
             path = [path]
         for p in path:
-            _logger.debug("Parsing %s", p)
             p = pathlib.Path(p)
             if p.is_dir():
+                _logger.debug("Recursive on %s", p)
                 yield from self.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
             elif p.is_file():
+                _logger.debug("Parsing %s", p)
                 with open(p, "r") as f:
                     data = f.read()
                 soup = BeautifulSoup(data, features="html.parser")
                 yield from soup.find_all(name=elm_name, **kwargs)
             else:
-                print("ERROR ARGUMENT IS NOT A FILE")
+                _logger.error("%s IS NOT A FILE", p)
 
 
 class Writer(ABC):
@@ -105,7 +106,7 @@ class ImageExtractor(Extractor):
         if sort:
             art_link_paths = list(art_link_paths)
             art_link_paths.sort()
-        print("art_links are: ")
+        _logger.info("art_links are: ")
 
         self.writer.output_items(art_link_paths)
 
@@ -184,7 +185,7 @@ class NoCropImageExtractorLarge(NoCropImageExtractor):
 
         maximum = max(result, default=None)
         if maximum:
-            # print(maximum)
+            _logger.debug("maximum is %s", maximum)
             yield maximum
 
 
@@ -311,9 +312,8 @@ class DescriptionExtractor(OnePerPageExtractor):
         section = soup.find("div", id="description")
 
         if not section:
-            print(f"ERROR {name} file has no description section")
+            _logger.error("ERROR %s file has no description section", name)
             return
-        # print(section)
         output = md(str(section))
         self.writer.output_content_to_directory(name.with_suffix(".md").name, output)
         return super().handle_page(name, soup)
@@ -328,7 +328,7 @@ class StoryExtractor(OnePerPageExtractor):
         section = soup.find("section", class_="HiQtsh")
 
         if not section:
-            print(f"ERROR {name} file has no section")
+            _logger.error("ERROR %s file has no section", name)
             return
         output = md(str(section))
         self.writer.output_content_to_directory(name.with_suffix(".md").name, output)
@@ -349,28 +349,26 @@ class JsonExtractor(Extractor):
             for y in ys
             if y.is_file()
         ]
-        for input in input_path:
-            if not input.exists():
-                _logger.error("ERROR %s file does not exist", input)
+        for name in input_path:
+            if not name.exists():
+                _logger.error("ERROR %s file does not exist", name)
                 continue
-            with open(input, "r", encoding=sys.getfilesystemencoding()) as f:
+            with open(name, "r", encoding=sys.getfilesystemencoding()) as f:
                 soup = BeautifulSoup(f.read(), features="html.parser")
-            # section = soup.find("div", id="description")
             script = soup.find("script", id="_R_")
             if not script:
-                _logger.error("ERROR %s file has no _R_ script section", input)
+                _logger.error("ERROR %s file has no _R_ script section", name)
                 continue
             text = script.text
-            print(text)
             lines = text.split("\n")
             important: str = lines[3]
             # make a lot of assumption no of the structure
             important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
             # kinda dangeroues to run arbartraty code,
-
             important = eval(important, {}, {})
             # parse to obj and back to string
             try:
+                # prettify the JSON
                 json_content = json.loads(important)
                 output = json.dumps(
                     json_content,
@@ -381,9 +379,9 @@ class JsonExtractor(Extractor):
                     indent=2,
                 )
             except json.decoder.JSONDecodeError:
-                print(f"ERROR {input} has an imparseble json content")
+                _logger.error("ERROR %s has an imparseble json content",name)
                 output = important
-            name = input.with_suffix(".json").name
+            name = name.with_suffix(".json").name
             self.writer.output_content_to_directory(name, output)
 
     def retrieve(self, input_path) -> Iterable:
@@ -391,7 +389,7 @@ class JsonExtractor(Extractor):
 
 
 class JsonImageUrlExtractor(Extractor):
-    def extract(self, input_path, output_path):
+    def extract(self, /, input_path, **kwargs):
         all_urls = self.retrieve(input_path=input_path)
         all_urls = sorted(dict.fromkeys(all_urls))
         self.writer.output_items(all_urls)
@@ -420,26 +418,29 @@ class JsonImageUrlExtractor(Extractor):
         baseUri = media.get("baseUri")
         prettyName = media.get("prettyName")
         tokens = media.get("token")
+        if not tokens:
+            _logger.warning("No tokens available for %s, %s", prettyName, baseUri)
         token = "?token=" + tokens[0] if tokens else ""
         types: list[dict] = media.get("types")
 
         # t is fullview or pre or social_preview
         # find first fullview, then preview and social_preview as backups
         fullviews = [t for x in ["fullview", "preview", "social_preview"] for t in types if t.get("t") == x]
-        print(fullviews)
         if fullviews:
             fullview = fullviews[0]
             c = fullview.get("c") or ""
             extension = c.replace("<prettyName>", prettyName)
             url = baseUri + extension + token
+            _logger.debug("URL for %s is %s", prettyName, url)
             return url
+        else:
+            _logger.info("No fullviews for %s, %s", prettyName, baseUri)
         return ""
 
     def retrieve(self, input_path):
         a = self.find_elements(input_path, "script", id="_R_")
         for b in a:
             text = b.text
-            print(text)
             lines = text.split("\n")
             important: str = lines[3]
             # make a lot of assumption no of the structure
@@ -447,7 +448,7 @@ class JsonImageUrlExtractor(Extractor):
             # kinda dangeroues to run arbartraty code,
             important = eval(important, {}, {})
             x = json.loads(important)
-            print(x)
+            _logger.debug("evaluated line of %s", x)
             # find all "media"
             medias = self.find_props(x, "media")
             # construct url

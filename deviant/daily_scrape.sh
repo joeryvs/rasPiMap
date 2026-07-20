@@ -23,13 +23,13 @@ if [ -d $today_map ] ; then
 fi
 
 mkdir -p $today_map
-curl https://www.deviantart.com/ -o "$today_index"
+curl https://www.deviantart.com/ --output "$today_index" --silent
 # call python script
 python webscrape_dev.py no_crop_large -i "$today_index" -o "$today_art_links"
 # sort and unique
 sort "$today_art_links" --unique -o "$today_art_links"
 # Download all images
-wget --user-agent=Mozilla --wait=0.2 --random-wait --input-file="./art-$today.txt" --directory-prefix="$today_map"
+wget --user-agent=Mozilla --wait=0.2 --random-wait --input-file="./art-$today.txt" --directory-prefix="$today_map" --no-verbose
 
 pwd
 # clean

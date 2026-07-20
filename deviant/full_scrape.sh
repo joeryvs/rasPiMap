@@ -7,14 +7,14 @@ fi
 
 name="$1"
 
-gallary_base_url="https://deviantart.com/$name/gallery"
+gallary_base_url="https://www.deviantart.com/$name/gallery?page=1"
 current_dir="$(dirname $0)"
-main_gallery_page="$current_dir/"$name"_gal_page_1"
+main_gallery_page="$current_dir/"$name"_gal_page_1.html"
 curl "$gallary_base_url" -o "$main_gallery_page"
 
 echo $gallary_base_url $current_dir $main_gallery_page
 # find the highest available gallary page
-gallary_amount=$(python "$current_dir/webscrape_dev.py" highest_user_page_number -o - -i "$gallary_base_url" --quiet --log-level NOTSET)
+gallary_amount=$(python "$current_dir/webscrape_dev.py" highest_user_page_number -o - -i "$main_gallery_page" --quiet --log-level CRITICAL)
 # download all gallary pages, extracted into seperate sh script in gallary-pages
 "$current_dir/gallary-pages/scrape_user.sh" "$name" "$gallary_amount"
 

@@ -9,7 +9,7 @@ user="$1"
 amount="$2"
 
 # check first argument in a valid user
-re='^[a-z]+$'
+re='^[a-z0-9\-]+$'
 if ! [[ $user =~ $re ]] ; then
     echo "error: not a valid user" >&2;
     exit 1;
@@ -27,4 +27,4 @@ dir="$(dirname $0)/$user"
 # create directory
 mkdir -p "$dir"
 # download all pages
-curl "$url" -o "$dir/gallery_page_#1.html"
+curl --limit-rate 1000M "$url" --output "$dir/gallery_page_#1.html" --fail

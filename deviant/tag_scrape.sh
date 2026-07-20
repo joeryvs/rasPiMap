@@ -16,13 +16,17 @@ fi
 
 today=$(date +%Y-%j)
 
+ALL_TAGS=()
+while [[ $# != 0 ]]; do
+    ALL_TAGS+=("$1")
+    shift
+done;
+
 # create maps
 mkdir -p tag/{front-page,links}
 
 # exaust all parameters
-while [[ $# != 0 ]];do
-    tag="$1"
-    shift
+for tag in "${ALL_TAGS[@]}"; do
     echo $tag
 
     url="https://www.deviantart.com/tag/$tag"
@@ -43,9 +47,9 @@ while [[ $# != 0 ]];do
 
 
     mkdir -p "$today_tag_map"
-    curl "$url" -o "$today_tag_index"
+    curl "$url" --output "$today_tag_index" --silent
     # call python script
-    python webscrape_dev.py no_crop_large -i "$today_tag_index" -o "$today_tag_art_links"
+    python webscrape_dev.py no_crop_large -i "$today_tag_index" -o "$today_tag_art_links" --no-sort --no-unique
     # sort and unique
     sort "$today_tag_art_links" --unique -o "$today_tag_art_links"
     # Download all images
