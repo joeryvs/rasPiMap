@@ -2,7 +2,8 @@
 import argparse
 import logging
 
-from webscrape_extractors import ExtractorFactory, FileWriter, Reader, StdoutWriter
+from deviant.factory import ExtractorFactory
+from deviant.utils import FileWriter, Reader, StdoutWriter
 
 
 def main():

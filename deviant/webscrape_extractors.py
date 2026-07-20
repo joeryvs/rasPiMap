@@ -10,88 +10,14 @@ from collections.abc import Generator
 from typing import Iterable
 
 from bs4 import BeautifulSoup
+from deviant.utils import Extractor
 from markdownify import markdownify as md
 from srcset_parsing import ImageType, parse_src_set
 
 _logger = logging.getLogger(__name__)
 
 
-class Reader:
-    def find_elements(self, path, elm_name, **kwargs):
-        if not isinstance(path, Iterable):
-            path = [path]
-        for p in path:
-            p = pathlib.Path(p)
-            if p.is_dir():
-                _logger.debug("Recursive on %s", p)
-                yield from self.find_elements(path=(p / n for n in os.listdir(p)), elm_name=elm_name, **kwargs)
-            elif p.is_file():
-                _logger.debug("Parsing %s", p)
-                with open(p, "r") as f:
-                    data = f.read()
-                soup = BeautifulSoup(data, features="html.parser")
-                yield from soup.find_all(name=elm_name, **kwargs)
-            else:
-                _logger.error("%s IS NOT A FILE", p)
 
-
-class Writer(ABC):
-    @abstractmethod
-    def output_items(self, items):
-        pass
-
-    @abstractmethod
-    def output_content_to_directory(self, name, content):
-        pass
-
-
-class StdoutWriter(Writer):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def output_items(self, items):
-        for p in items:
-            print(p)
-
-    def output_content_to_directory(self, name, content):
-        print("##", name)
-        print(content)
-        return super().output_content_to_directory(name, content)
-
-
-class FileWriter(Writer):
-    def __init__(self, output) -> None:
-        self.output_file = pathlib.Path(output)
-        super().__init__()
-
-    def output_items(self, items):
-
-        with open(self.output_file, "w") as f:
-            for i in items:
-                print(i, file=f)
-
-    def output_content_to_directory(self, name, content):
-        path = self.output_file / name
-        os.makedirs(self.output_file, exist_ok=True)
-        with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
-            print(content, file=f)
-
-
-class Extractor(ABC):
-    def __init__(self, reader: Reader, writer: Writer):
-        self.reader = reader
-        self.writer = writer
-
-    def find_elements(self, path, elm_name, **kwargs):
-        return self.reader.find_elements(path, elm_name, **kwargs)
-
-    @abstractmethod
-    def extract(self, /, input_path, **kwargs):
-        pass
-
-    @abstractmethod
-    def retrieve(self, input_path) -> Iterable:
-        return []
 
 
 class ImageExtractor(Extractor):
@@ -455,33 +381,3 @@ class JsonImageUrlExtractor(Extractor):
             urls = [self.construct_url_from_media(media) for media in medias]
             yield from urls
         pass
-
-
-class ExtractorFactory:
-    def __init__(self):
-        self._options = {
-            "art": ArtPageExtractor,
-            "images": DeviantArtImageExtractor,
-            "images2x": DeviantArtImage2XExtractor,
-            "large_images": LargeImageExtractor,
-            "no_crop": NoCropImageExtractor,
-            "no_crop_large": NoCropImageExtractorLarge,
-            "all_images": AllImagesExtractor,
-            "main_image": MainImageExtractor,
-            "avatar": AvatarExtractor,
-            "users": UserPageExtractor,
-            "highest_user_page_number": HighestUserExtractor,
-            "all_links": AllPagesExtractor,
-            "tags": TagPageExtractor,
-            "description": DescriptionExtractor,
-            "story": StoryExtractor,
-            "json": JsonExtractor,
-            "json_art": JsonImageUrlExtractor,
-        }
-
-    @property
-    def choices(self):
-        return list(self._options.keys())
-
-    def extractor(self, item, *args, **kwargs) -> Extractor:
-        return self._options[item](*args, **kwargs)
