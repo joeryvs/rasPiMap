@@ -29,7 +29,7 @@ DESCRIPTION_LOCATION=""$user"_description"
 
 
 # download each page using wget
-wget --input-file="$ART_PAGE_URL" --directory-prefix="$ART_PAGE_STORE_DIR" --random-wait --wait="$WAIT_TIME"
+wget --input-file="$ART_PAGE_URL" --directory-prefix="$ART_PAGE_STORE_DIR" --random-wait --wait="$WAIT_TIME" --no-verbose
 # find all img locations
 python webscrape_dev.py main_image -i "$ART_PAGE_STORE_DIR" -o "$IMAGE_URLS_FILE"
 # write description folder

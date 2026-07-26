@@ -27,23 +27,24 @@ class JsonImageUrlExtractor(Extractor):
             if isinstance(obj, list):
                 for item in obj:
                     find_prop_rec(item)
-            pass
 
         find_prop_rec(dictionary)
         return result
 
     def construct_url_from_media(self, media):
-        baseUri = media.get("baseUri")
-        prettyName = media.get("prettyName")
-        tokens = media.get("token")
+        baseUri: str = media.get("baseUri")
+        prettyName: str = media.get("prettyName")
+        tokens: list[str] = media.get("token")
+        # if baseUri is None:
+        #     _logger.error("current media has no baseUri: %s", media)
+        # if prettyName is None:
+        #     _logger.error("current media has no prettyName: %s", media)
         if not tokens:
             _logger.warning("No tokens available for %s, %s", prettyName, baseUri)
         token = "?token=" + tokens[0] if tokens else ""
         types: list[dict] = media.get("types")
 
-        # t is fullview or pre or social_preview
-        # find first fullview, then preview and social_preview as backups
-        fullviews = [t for x in ["fullview", "preview", "social_preview"] for t in types if t.get("t") == x]
+        fullviews = [t for x in self._image_size_order() for t in types if t.get("t") == x]
         if fullviews:
             fullview = fullviews[0]
             c = fullview.get("c") or ""
@@ -54,6 +55,11 @@ class JsonImageUrlExtractor(Extractor):
         else:
             _logger.info("No fullviews for %s, %s", prettyName, baseUri)
         return ""
+
+    def _image_size_order(self) -> list[str]:
+        # t is fullview or pre or social_preview
+        # find first fullview, then preview and social_preview as backups
+        return ["fullview", "preview", "social_preview"]
 
     def retrieve(self, input_path):
         a = self.find_elements(input_path, "script", id="_R_")
@@ -72,4 +78,9 @@ class JsonImageUrlExtractor(Extractor):
             # construct url
             urls = [self.construct_url_from_media(media) for media in medias]
             yield from urls
-        pass
+
+
+class JsonImagePreUrlExtractor(JsonImageUrlExtractor):
+    def _image_size_order(self) -> list[str]:
+        # preview is the one that is guaranteed to be not to large
+        return ["preview"]

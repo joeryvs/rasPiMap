@@ -14,12 +14,12 @@ curl "$gallary_base_url" -o "$main_gallery_page"
 
 echo $gallary_base_url $current_dir $main_gallery_page
 # find the highest available gallary page
-gallary_amount=$(python "$current_dir/webscrape_dev.py" highest_user_page_number -o - -i "$main_gallery_page" --quiet --log-level CRITICAL)
+gallary_amount=$(python "$current_dir/main.py" highest_user_page_number -o - -i "$main_gallery_page" --quiet --log-level CRITICAL)
 # download all gallary pages, extracted into seperate sh script in gallary-pages
 "$current_dir/gallary-pages/scrape_user.sh" "$name" "$gallary_amount"
 
 # extract individual pages into a single file
-python "$current_dir/webscrape_dev.py" art -i "$current_dir/gallary-pages/$name" -o "$current_dir/"$name"_art.txt" --sort --uni
+python "$current_dir/main.py" art -i "$current_dir/gallary-pages/$name" -o "$current_dir/"$name"_art.txt" --sort --uni
 
 sleep 100
 
@@ -29,10 +29,10 @@ wget --no-verbose --input-file="$current_dir/"$name"_art.txt" --directory-prefix
 
 sleep 3
 
-python "$current_dir/webscrape_dev.py" description -i "$art_pages_dir" -o "$current_dir/"$name"_desc"
-python "$current_dir/webscrape_dev.py" story -i "$art_pages_dir" -o "$current_dir/"$name"_story"
+python "$current_dir/main.py" description -i "$art_pages_dir" -o "$current_dir/"$name"_desc"
+python "$current_dir/main.py" story -i "$art_pages_dir" -o "$current_dir/"$name"_story"
 art_link_file="$current_dir/"$name"_main_images.txt"
-python "$current_dir/webscrape_dev.py" main_image -i "$art_pages_dir" -o "$art_link_file"
+python "$current_dir/main.py" main_image -i "$art_pages_dir" -o "$art_link_file"
 
 sleep 7
 image_output_dir="$current_dir/"$name"_images"

@@ -49,7 +49,7 @@ for tag in "${ALL_TAGS[@]}"; do
     mkdir -p "$today_tag_map"
     curl "$url" --output "$today_tag_index" --silent
     # call python script
-    python webscrape_dev.py no_crop_large -i "$today_tag_index" -o "$today_tag_art_links" --no-sort --no-unique
+    python main.py no_crop_large -i "$today_tag_index" -o "$today_tag_art_links" --no-sort --no-unique
     # sort and unique
     sort "$today_tag_art_links" --unique -o "$today_tag_art_links"
     # Download all images

@@ -35,6 +35,34 @@ THe post Data consist of *body*
 
 need more debug info
 
+### instructions
+
+go to someonse post page.
+scroll down and click on *every* right-arrow, images should be lazy loaded in. eventually the infinite scroll stops.
+
+After wards, click on lock, and find the media tab. and download copy the urls to a seperate file
+
+Open vim.  
+select "=s" as the search command, press **gg0** to go to the first character on the first row.
+
+Record a macro **0nllcw4000** Esc **ld7ej0**
+
+
+This should change the wanted size to 4000, and remove the crop of the image.
+Call the macro for every line. use Ctrl + g to find out how many lines are left
+
+there might be video thumbnails or data:// present. remove them or ignore them
+Save the file (as new).
+
+and download using `wget --input-file "file.txt" --directory-prefix Files --wait 1.0 --random-wait --no-verbose`
+
+After wards you can add the extension with `ls -1 | while read f ; do mv ""$f"" ""$f".webp" ; done`
+
+it works mostly but characters that start with - are tricky
+
+
+
+
 ## Taking from source
 
 when downloading an individual page, of front-page image or other. you usually get a bunch of JS
