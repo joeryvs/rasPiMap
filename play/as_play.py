@@ -1,49 +1,51 @@
 import asyncio
 import os
 import pathlib
-import uuid
+import random
 
-from playwright.async_api import Playwright, Route, async_playwright
-from utils import persistent_data
+from playwright.async_api import Playwright, async_playwright
+from utils import persistent_data, save_response_handler
 
 
-async def run(playwright: Playwright, todo, seen):
-    temp_path = pathlib.Path(__file__).parent / "temp_storage"
+async def run(playwright: Playwright, todo, seen, type, downloaded):
+    temp_path = pathlib.Path(__file__).parent / "temp_storage4"
     os.makedirs(temp_path, exist_ok=True)
 
-    async def handle(route: Route):
-        response = await route.fetch()
-        body = await response.body()
-        with open(temp_path / uuid.uuid4().hex[:12], "wb") as f:
-            f.write(body)
-        await route.fulfill(response=response)
-
-    browser = await playwright.chromium.launch()
-    page = await browser.new_page()
-    await page.route("**/*", handle)
-
-    while todo:
+    browser = await playwright.chromium.launch(headless=False)
+    context = await browser.new_context()
+    await context.route("**/*", save_response_handler(temp_path, type, downloaded))
+    page = await context.new_page()
+    while todo and len(seen) < 80:
         url = todo.pop()
         if url in seen:
             continue
+        if not url or not url.startswith("https://"):
+            continue
         await page.goto(url=url)
         seen.append(url)
-
+        # wait to prevent errora
+        await page.wait_for_timeout(timeout=random.uniform(5000, 6000))
+        # reject cookies if available action-type="DENY"
+        obj = await page.locator("button[action-type='DENY']").all()
+        if obj:
+            await obj[0].click()
         href = await page.evaluate("() => document.location.href")
         print(href)
         urls = await page.evaluate(
             "() => document.querySelectorAll('a').values().map(a => a['href']).filter(x => x).reduce((a,b) => a + '\\n' + b, '')"
         )
-        print(urls)
+        # print(urls)
         todo.extend(urls.split("\n"))
+        print(len(todo), len(seen))
+    await browser.close()
 
 
 async def main():
-    # todo = persistent_data("todo.json", ["https://www.example.com"])
-    # seen = persistent_data("seen.json", [])
-    items = persistent_data("items.json", {"todo": ["https://example.com"], "seen": []})
+    items = persistent_data(
+        "items.json", {"todo": ["https://www.example.com"], "seen": [], "new_type": [], "downloaded": []}
+    )
     async with async_playwright() as playwright:
-        await run(playwright, items.data["todo"], items.data["seen"])
+        await run(playwright, items.data["todo"], items.data["seen"], items.data["new_type"], items.data["downloaded"])
     pass
 
 

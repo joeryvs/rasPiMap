@@ -23,7 +23,7 @@ def scrape_playwright_website():
 
     with sync_playwright() as p:
         with p.webkit.launch() as browser:
-            page = browser.new_page()
+            page = browser.new_page(headless=False)
             page.route("**/*", cancel_all_but_main_reroute)
             page.goto(MAIN)
             page.screenshot(path="example3.png")
