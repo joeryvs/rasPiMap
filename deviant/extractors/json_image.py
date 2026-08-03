@@ -35,6 +35,8 @@ class JsonImageUrlExtractor(Extractor):
         baseUri: str = media.get("baseUri")
         prettyName: str = media.get("prettyName")
         tokens: list[str] = media.get("token")
+        if not baseUri or not prettyName:
+            _logger.debug("Missing baseUri or prettyName in %s", media)
         # if baseUri is None:
         #     _logger.error("current media has no baseUri: %s", media)
         # if prettyName is None:
@@ -48,7 +50,7 @@ class JsonImageUrlExtractor(Extractor):
         if fullviews:
             fullview = fullviews[0]
             c = fullview.get("c") or ""
-            extension = c.replace("<prettyName>", prettyName)
+            extension = c.replace("<prettyName>", prettyName or "")
             url = baseUri + extension + token
             _logger.debug("URL for %s is %s", prettyName, url)
             return url
