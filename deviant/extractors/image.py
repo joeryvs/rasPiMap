@@ -13,11 +13,12 @@ class ImageExtractor(Extractor):
 
     def extract(self, /, input_path, sort=True, unique=True, **kwargs):
         art_links = self.retrieve(input_path)
-        # remove duplicates
         art_link_paths = art_links
         if unique:
+            _logger.info("Taking unique items")
             art_link_paths = list(dict.fromkeys(art_links))
         if sort:
+            _logger.info("Sorting items")
             art_link_paths = list(art_link_paths)
             art_link_paths.sort()
         _logger.info("art_links are: ")

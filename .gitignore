@@ -57,6 +57,7 @@ venv
 *json
 # haskell files
 *.hi
+*.sqlite
 
 __pycache__/
 mapPython/comics/
