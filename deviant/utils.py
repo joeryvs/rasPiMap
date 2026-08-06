@@ -1,9 +1,10 @@
+import io
 import logging
 import os
 import pathlib
 import sys
 from abc import ABC, abstractmethod
-from typing import Iterable
+from collections.abc import Iterable
 
 from bs4 import BeautifulSoup
 
@@ -12,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 class Reader:
     def find_elements(self, path, elm_name, **kwargs):
-        if not isinstance(path, Iterable):
+        if isinstance(path, (str, pathlib.Path, bytes)):
             path = [path]
         for p in path:
             p = pathlib.Path(p)
@@ -69,6 +70,25 @@ class FileWriter(Writer):
         os.makedirs(self.output_file, exist_ok=True)
         with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
             print(content, file=f)
+
+
+class IOWriter(Writer):
+    def __init__(self) -> None:
+        self.buffer = io.StringIO()
+        super().__init__()
+
+    def output_items(self, items):
+        for i in items:
+            print(i, file=self.buffer)
+
+    def output_content_to_directory(self, name, content):
+        print("##", name, file=self.buffer)
+        print(content, file=self.buffer)
+        return super().output_content_to_directory(name, content)
+
+    @property
+    def get_buffer(self):
+        return self.buffer
 
 
 class Extractor(ABC):

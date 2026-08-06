@@ -8,7 +8,6 @@ _logger = logging.getLogger(__name__)
 
 class HighestUserExtractor(UserPageExtractor):
     def extract(self, /, input_path, **kwargs):
-        assert len(input_path) == 1
 
         art_links = self.retrieve(input_path=input_path)
         art_link_paths = map(self.post_proces_function, art_links)
