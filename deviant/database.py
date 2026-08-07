@@ -66,21 +66,22 @@ def find_image_publish_date(cur: sqlite3.Connection, image_file_name) -> None | 
     #         WHERE
     #         isize.FILENAME = ?
     #         -- AND isize.entityID = im.entityID
+    #         LIMIT 1
     #     """,
     #     [file_name],
     # )
     # print(t2.fetchmany(100))
     # continue
     IMAGE_SIZE = cur.execute(
-        "SELECT entityID,type, filename FROM imageSize as isize where isize.filename = ?", [image_file_name]
+        "SELECT entityID,type, filename FROM imageSize as isize where isize.filename = ? LIMIT 1", [image_file_name]
     ).fetchone()
-    print(IMAGE_SIZE)
+    # print(IMAGE_SIZE)
     # input()
     # continue
     if IMAGE_SIZE:
         enityID = IMAGE_SIZE[0]
-        IMAGE = cur.execute("SELECT publishedDate,title FROM image WHERE entityID = ?", [enityID]).fetchone()
-        print(IMAGE)
+        IMAGE = cur.execute("SELECT publishedDate,title FROM image WHERE entityID = ? LIMIT 1", [enityID]).fetchone()
+        # print(IMAGE)
         if IMAGE:
             TIME = IMAGE[0]
             TIME = datetime.datetime.fromisoformat(TIME)
@@ -89,12 +90,12 @@ def find_image_publish_date(cur: sqlite3.Connection, image_file_name) -> None | 
 
 
 def find_markdown_publish_date(cur: sqlite3.Connection, markdown_file_name) -> None | float:
-    IMAGE = cur.execute("SELECT publishedDate,title FROM image WHERE pageTitle = ?", [markdown_file_name]).fetchone()
-    print(IMAGE)
+    IMAGE = cur.execute("SELECT publishedDate,title FROM image WHERE pageTitle = ? LIMIT 1", [markdown_file_name]).fetchone()
+    # print(IMAGE)
     if IMAGE:
         TIME = IMAGE[0]
         TIME = datetime.datetime.fromisoformat(TIME)
-        print(TIME)
+        # print(TIME)
         return TIME.timestamp()
     return None
 
@@ -107,9 +108,9 @@ def find_image_upload_data(cur: sqlite3.Connection, directory_path) -> Generator
             full_path = os.path.join(a, p)
             full_path2 = pathlib.Path(full_path)
             file_name = full_path2.name
-            print(full_path, file_name)
+            # print(full_path, file_name)
             assert file_name
-            if full_path2.suffix in (".md", ".json"):
+            if full_path2.suffix in (".md", ".json", ".html", ""):
                 TIME = find_markdown_publish_date(cur, full_path2.with_suffix("").name)
             else:
                 TIME = find_image_publish_date(cur, file_name)
@@ -150,12 +151,13 @@ def create_json_data(directory_path):
     for a, b, c in os.walk(directory_path):
         for p in c:
             full_path = os.path.join(a, p)
-            print(full_path)
+            _logger.info("Parsing %s", full_path)
             with open(full_path, "r") as fp:
                 try:
                     obj = json.load(fp)
                     yield from extract_items_from_json(obj)
-                except json.decoder.JSONDecodeError:
+                except json.decoder.JSONDecodeError as e:
+                    _logger.warning("JSON ERROR PARSING %s, %s", full_path, e.msg)
                     continue
 
 
@@ -180,7 +182,7 @@ def extract_items_from_json(obj):
                 w2 = x2["w"]
                 h2 = x2["h"]
                 t2 = f"{type}-{x2['x']}x"
-                c2 = x.get("c", "")
+                c2 = x2.get("c", "")
                 f2 = get_file_name(c2, pretty_name, base_uri)
                 yield id, w2, h2, t2, c2, f2, R
 
@@ -205,23 +207,30 @@ def extract_items_from_json(obj):
 
 
 def read_db(db: sqlite3.Connection):
-    cur = db.cursor()
-    # for i, row in enumerate(cur.execute("SELECT title,prettyName,baseUri,url,shortUrl FROM image")):
-    for i, row in enumerate(cur.execute("SELECT entityId,title,pageTitle FROM image")):
-        print(i, row, sep=": ")
+    q = "SELECT entityId,title,pageTitle FROM image"
+    run_query(db, q)
 
 
 def read_db2(db: sqlite3.Connection):
+    q = "SELECT filename,width,height,type,radius FROM imagesize"
+    run_query(db, q)
+
+
+def run_query(db: sqlite3.Connection, query):
     cur = db.cursor()
-    for i, row in enumerate(cur.execute("SELECT filename,width,height,type,radius FROM imagesize")):
+    for i, row in enumerate(cur.execute(query)):
         print(i, row, sep=": ")
+    # query is read only no saving
+    db.rollback()
 
 
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--database", "-d", type=pathlib.Path, required=True)
-    parser.add_argument("--files", type=pathlib.Path, required=True)
+    p = parser.add_mutually_exclusive_group()
+    p.add_argument("--files", type=pathlib.Path)
+    p.add_argument("--query", type=str)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--log-level", choices=logging._levelToName.values(), default="INFO")
 
@@ -234,7 +243,9 @@ def main():
     db = create_db(args.database)
     logging.basicConfig(level=args.log_level)
 
-    if args.read:
+    if args.query:
+        run_query(db, args.query)
+    elif args.read:
         read_db(db)
     elif args.update_times:
         update_file_times(db, args.files, args.dry_run)

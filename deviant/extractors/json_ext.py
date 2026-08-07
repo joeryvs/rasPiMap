@@ -6,7 +6,6 @@ import sys
 from collections.abc import Iterable
 
 from bs4 import BeautifulSoup
-
 from utils import Extractor
 
 _logger = logging.getLogger(__name__)
