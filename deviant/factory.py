@@ -18,7 +18,6 @@ from extractors import (
     MainImageExtractor,
     NoCropImageExtractor,
     NoCropImageExtractorLarge,
-    OnePerPageExtractor,
     PageExtractor,
     StoryExtractor,
     TagPageExtractor,
