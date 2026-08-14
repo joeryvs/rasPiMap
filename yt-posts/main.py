@@ -1,6 +1,7 @@
 import argparse
 import io
 import json
+import logging
 import multiprocessing
 import os
 import pathlib
@@ -8,19 +9,26 @@ import subprocess
 import sys
 import threading
 import time
+from re import T
 from typing import Any
+from uuid import uuid4
+
+from bs4 import BeautifulSoup
+from utils import find_key_rec, find_keys_rec
+
+_logger = logging.getLogger(__name__)
 
 
 class YtPostScraper:
     def __init__(self, base_dir, graft_url) -> None:
-        self._base_dir = base_dir
-        self.graft_url = graft_url
+        self._base_dir: str = base_dir
+        self.graft_url: str = graft_url
 
         assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
             "Scraping store directory does not exist"
         )
 
-    def get_data_raw(self, continuation, tracking_param):
+    def get_data_raw(self, continuation: str, tracking_param: str):
         return {
             "context": {
                 "client": {
@@ -95,7 +103,7 @@ class YtPostScraper:
             "continuation": continuation,
         }
 
-    def run_curl_command2(self, continuation, tracking_param, index=0):
+    def run_curl_command2(self, continuation: str, tracking_param: str, index: int = 0):
         DATARAW = self.get_data_raw(continuation=continuation, tracking_param=tracking_param)
         dataraw = json.dumps(DATARAW, allow_nan=False, check_circular=True, ensure_ascii=True)
         args = [
@@ -116,11 +124,11 @@ class YtPostScraper:
         out_path = os.path.join(self._base_dir, f"out_{index}.txt")
         err_path = os.path.join(self._base_dir, f"err_{index}.txt")
         with open(out_path, "w") as f_out, open(err_path, "w") as f_err:
-            subprocess.run(args=args, check=True, stdout=f_out, stderr=f_err)
+            _ = subprocess.run(args=args, check=True, stdout=f_out, stderr=f_err)
 
         return out_path
 
-    def runloop(self, continuation, tracking_params):
+    def runloop(self, continuation: str, tracking_params: str):
 
         c, t = continuation, tracking_params
 
@@ -140,7 +148,6 @@ class YtPostScraper:
             # Get new token and trackingParams
             c = c2.get("token")
             t = data.get("trackingParams")
-            input()
 
             assert c is not None
             index += 1
@@ -148,44 +155,80 @@ class YtPostScraper:
             print(data)
             time.sleep(2)
 
-    def download_main_page(self):
+    def download_page(self):
 
-        args = ["curl", "--url", self.graft_url]
+        from urllib.request import urlopen
 
-        subprocess.run(args, check=True)
+        with urlopen(self.graft_url, timeout=3000) as f:
+            data = f.read()
 
+        return data
+        # path = "test.html"
+        # with open(path, "r") as f:
+        # data = f.read()
+        # return data
 
-def run(input_file, output_file):
+    def retrieve_contiunationcommand_and_tracking_param_from_soup(self, soup):
 
-    with open(input_file, "r") as f:
-        data = json.load(fp=f)
-    print(data)
+        # step 1, download the PAGE, And get it into RAM
+        # Step 2, extract the correct script definition
+        scripts = soup.find_all("script")
 
-    with open(output_file, "w") as f:
-        json.dump(obj=data, fp=f, allow_nan=False, check_circular=True, indent=2)
+        if not scripts:
+            _logger.error("No Script found")
+            return
 
+        # YOLO to find the continuation command which ends in %3D%3D
+        scripts = [x for x in scripts if x.text.startswith("var ytInitialData")]
+        if not scripts:
+            _logger.error("Non of the scripts define the variable ytInitialData")
+        value = str(scripts[0].text.removesuffix(";").removeprefix("var ytInitialData = "))
+        json_obj = json.loads(value)
+        # keys_to_continuation_token = [
+        #     "contents",
+        #     "twoColumnBrowseResultsRenderer",
+        #     "tabs",
+        #     -1,
+        #     "tabRenderer",
+        #     "content",
+        #     "sectionListRenderer",
+        #     "contents",
+        #     0,
+        #     "itemSectionRenderer",
+        #     "contents",
+        #     -1,
+        #     "continuationItemRenderer",
+        #     "continuationEndpoint",
+        #     "continuationCommand",
+        #     "token",
+        # ]
+        # ['header', 'pageHeaderRenderer', 'content', 'pageHeaderViewModel', 'description', 'descriptionPreviewViewModel', 'rendererContext', 'commandContext', 'onTap', 'innertubeCommand', 'showEngagementPanelEndpoint', 'engagementPanel', 'engagementPanelSectionListRenderer', 'content', 'sectionListRenderer', 'contents', 0, 'itemSectionRenderer', 'contents', 0, 'continuationItemRenderer', 'continuationEndpoint', 'continuationCommand']
+        # ['header', 'pageHeaderRenderer', 'content', 'pageHeaderViewModel', 'attribution', 'attributionViewModel', 'suffix', 'commandRuns', 0, 'onTap', 'innertubeCommand', 'showEngagementPanelEndpoint', 'engagementPanel', 'engagementPanelSectionListRenderer', 'content', 'sectionListRenderer', 'contents', 0, 'itemSectionRenderer', 'contents', 0, 'continuationItemRenderer', 'continuationEndpoint', 'continuationCommand']
+        # Step 3 find and return the continuationCommand
+        # command = json_obj
+        command = find_key_rec(json_obj, "continuationCommand")[1]["token"]
+        # for index in keys_to_continuation_token:
+        # command = command[index]
 
-def find_key_rec(obj, key):
-    SENTINAL = object()
+        assert isinstance(command, str)
 
-    def find_key_rec2(obj) -> None | tuple[list[str | int], Any]:
-        if isinstance(obj, dict):
-            if key in obj:
-                return [], (obj.get(key, SENTINAL) or SENTINAL)
+        trackingParams: str = json_obj["trackingParams"]
+        assert isinstance(trackingParams, str)
+        return command, trackingParams
 
-            for k, v in obj.items():
-                if (answer := find_key_rec2(v)) is not None:
-                    p, a = answer
-                    return ([k] + p), a
+    def run(self):
 
-        elif isinstance(obj, list):
-            for i, v in enumerate(obj):
-                if (answer := find_key_rec2(v)) is not None:
-                    p, a = answer
-                    return ([i] + p), a
-        return None
+        html_data = self.download_page()
+        soup = BeautifulSoup(html_data, features="html.parser")
+        ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
+        if not ans1:
+            _logger.error("No tokens found")
+            return
+        c, t = ans1
 
-    return find_key_rec2(obj=obj)
+        print(c)
+        print(t)
+        self.runloop(c, t)
 
 
 def main():
@@ -194,10 +237,8 @@ def main():
     tracking_param = "CCcQuy8YACITCOOa8dvLnZYDFWHCSQcdi_w6IMoBBDSTU08="
     graft_url = "https://www.youtube.com/@IGN/posts"
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input-file", type=pathlib.Path, required=True)
-    parser.add_argument("-o", "--output-file", type=pathlib.Path, required=True)
     parser.add_argument("-P", "--directory-prefix", type=str, default=".")
-    parser.add_argument("graft-url", required=False)
+    parser.add_argument("graft_url")
 
     args = parser.parse_args()
     if args.graft_url:
@@ -206,8 +247,7 @@ def main():
     os.makedirs(args.directory_prefix, exist_ok=True)
 
     scraper = YtPostScraper(args.directory_prefix, graft_url)
-    # scraper.run_curl_command2(continuation=continuation, tracking_param=tracking_param)
-    scraper.runloop(continuation=continuation, tracking_params=tracking_param)
+    scraper.run()
 
 
 if __name__ == "__main__":

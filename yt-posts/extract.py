@@ -4,33 +4,9 @@ import logging
 import os
 import sys
 
+from utils import find_key_rec, find_keys_rec
+
 _logger = logging.getLogger(__name__)
-
-
-def find_keys_rec(obj, key, with_path=False):
-    assert isinstance(key, str)
-    result = []
-    stack = []
-
-    def foo(obj):
-        if isinstance(obj, dict):
-            if key in obj:
-                # Create a new list
-                result.append((stack + [key], obj[key]) if with_path else obj[key])
-            for k, v in obj.items():
-                stack.append(k)
-                foo(v)
-                stack.pop()
-        elif isinstance(obj, list):
-            for i, v in enumerate(obj):
-                stack.append(i)
-                foo(v)
-                stack.pop()
-        elif obj == key:
-            result.append((stack.copy(), key) if with_path else key)
-
-    foo(obj)
-    return result
 
 
 # Good enough function to find all the urls
@@ -89,8 +65,8 @@ def run(files, output):
         try:
             with open(f, "r") as fp:
                 data = json.load(fp=fp)
-
-                for cui in extract_crop_image_urls2(data):
+                # WE use the slow brute foree solution
+                for cui in extract_crop_image_urls(data):
                     print(cui, file=output)
         except json.JSONDecodeError:
             _logger.warning("not valid JSON %s", f)
