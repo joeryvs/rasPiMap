@@ -10,7 +10,7 @@ from .deviant_art_image import (
 from .highest_user import HighestUserExtractor
 from .image import ImageExtractor
 from .json_ext import JsonExtractor
-from .json_image import JsonImagePreUrlExtractor, JsonImageUrlExtractor
+from .json_image import JsonImagePermutationExtractor, JsonImagePreUrlExtractor, JsonImageUrlExtractor
 from .main_image import MainImageExtractor
 from .no_crop_image import NoCropImageExtractor, NoCropImageExtractorLarge
 from .page import AllPagesExtractor, ArtPageExtractor, PageExtractor, TagPageExtractor, UserPageExtractor
@@ -26,6 +26,7 @@ __all__ = [
     "HighestUserExtractor",
     "ImageExtractor",
     "JsonExtractor",
+    "JsonImagePermutationExtractor",
     "JsonImagePreUrlExtractor",
     "JsonImageUrlExtractor",
     "LargeImageExtractor",

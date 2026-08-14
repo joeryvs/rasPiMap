@@ -20,7 +20,14 @@ _logger = logging.getLogger(__name__)
 
 
 def run(
-    user: str, *, wait_pages, wait_images, skip_gallary_download, skip_pages_download, skip_image_download, post_process
+    user: str,
+    *,
+    wait_pages: float,
+    wait_images: float,
+    skip_gallary_download: bool,
+    skip_pages_download: bool,
+    skip_image_download: bool,
+    post_process: bool,
 ):
     _logger.info("running process for %s", user)
     _logger.info(
@@ -38,9 +45,10 @@ def run(
         # Download gallary
         subprocess.run(["./user_page1_scrape.sh", user], check=True)
         writer = IOWriter()
-        HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)
+        HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)  # pyright: ignore[reportUnknownMemberType]
         str_buffer = writer.get_buffer
         AMOUNT = str(int(str_buffer.getvalue()))
+        _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
         subprocess.run(["gallary-pages/scrape_user.sh", user, AMOUNT], check=True)
     gal_pages = f"gallary-pages/{user}/"
     art_pages_link_file = f"{user}_art.txt"
@@ -50,7 +58,7 @@ def run(
         ArtPageExtractor(reader=reader, writer=FileWriter(art_pages_link_file)).extract(
             gal_pages, sort=True, unique=True
         )
-        subprocess.run(
+        _ = subprocess.run(
             [
                 "wget",
                 "--input-file",
@@ -85,6 +93,8 @@ def run(
         TagPageExtractor(reader=reader, writer=FileWriter(f"{user}_tag.txt")).extract(input_path=art_pages)
         ArtPageExtractor(reader=reader, writer=FileWriter(f"{user}_outgoing_art.txt")).extract(input_path=art_pages)
         # Download the image with wget
+        rejected_log = "rejected_log.log"
+        open(rejected_log, "a").close()
         cmd = [
             "wget",
             "--input-file",
@@ -95,12 +105,17 @@ def run(
             str(wait_images),
             "--random-wait",
             "--no-verbose",
+            "--rejected-log",
+            rejected_log,
         ]
-        p = subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, check=True)
-        _logger.info("Process %s, end with code %s", p.args, p.returncode)
+        try:
+            p = subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, check=True)
+            _logger.info("Process %s, end with code %s", p.args, p.returncode)
+        except subprocess.CalledProcessError as e:
+            _logger.error("Process %s Error with code %s", e.args, e.returncode)
 
         # remove the query parameter
-        subprocess.run(["../remove_post.sh", dir_main], check=True, capture_output=True)
+        _ = subprocess.run(["../remove_post.sh", dir_main], check=True, capture_output=True)
 
     user_db = f"{user}.sqlite"
     if post_process:

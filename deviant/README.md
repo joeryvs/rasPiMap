@@ -23,6 +23,15 @@ Use the following options `--user-agent=Mozilla --random-wait`
 in the root of the directory is a file **rename_all.sh** for which to rename all images to their hash.
 
 but you should use **remove_post.sh** to rename the files. without the query parameters
+
+## From JSON
+
+deviantart.com sends a lot of json into every page.
+use the "json" to extract in into a new file in a new directory.
+
+The extractors "json_art_pre", "json_art", "json_perm", try to extract the link to the full size image from the limited information 
+
+
 ## Youtube
 
 perform a POST request to **https://youtube.com/youtubei/v1/browse?prettyPrint=false**
@@ -84,3 +93,5 @@ with the rough formula
 ```js
 const url = baseUri + (types.find(x => x.t == "fullview")?.c ?? "").replace("<prettyName>",prettyName) + "?token=" + token[0]
 ```
+
+images that have blockreasons, only have 1 url. while urls that are fully visible provide 2.

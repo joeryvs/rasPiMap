@@ -12,6 +12,7 @@ from extractors import (
     HighestUserExtractor,
     ImageExtractor,
     JsonExtractor,
+    JsonImagePermutationExtractor,
     JsonImagePreUrlExtractor,
     JsonImageUrlExtractor,
     LargeImageExtractor,
@@ -48,6 +49,7 @@ class ExtractorFactory:
             "story": StoryExtractor,
             "json": JsonExtractor,
             "json_art": JsonImageUrlExtractor,
+            "json_perm": JsonImagePermutationExtractor,
             "json_art_pre": JsonImagePreUrlExtractor,
         }
 

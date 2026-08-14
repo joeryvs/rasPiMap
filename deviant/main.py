@@ -23,8 +23,6 @@ def get_arguments(choices: list[str]) -> argparse.ArgumentParser:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--log-level", choices=list(logging._levelToName.values()), default="INFO")
 
-    parser.add_argument_group()
-
     return parser
 
 

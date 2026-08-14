@@ -100,7 +100,7 @@ class Extractor(ABC):
         return self.reader.find_elements(path, elm_name, **kwargs)
 
     @abstractmethod
-    def extract(self, /, input_path, **kwargs):
+    def extract(self, /, input_path, **kwargs) -> None:
         pass
 
     @abstractmethod

@@ -16,32 +16,35 @@ def create_db(database) -> sqlite3.Connection:
 
     cur = con.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS image(
-        entityID CHAR NOT NULL ON CONFLICT FAIL UNIQUE ON CONFLICT IGNORE,
-        publishedDate DATETIME NOT NULL ON CONFLICT FAIL,
+        entityID TEXT NOT NULL ON CONFLICT FAIL UNIQUE ON CONFLICT IGNORE,
+        publishedDate TEXT NOT NULL ON CONFLICT FAIL,
         media TEXT,
-        baseUri CHAR,
-        prettyName CHAR,
-        hasBlockReasons BOOL,
+        baseUri TEXT,
+        prettyName TEXT,
+        hasBlockReasons INTEGER,
         shortUrl TEXT NOT NULL,
         url TEXT NOT NULL,
-        pageTitle CHAR NOT NULL,
+        pageTitle TEXT NOT NULL,
         title TEXT NOT NULL
-    )
+    ) STRICT
     """)
     cur.execute("""CREATE TABLE IF NOT EXISTS token(
-        entityID REFERENCES images (entityID) ON DELETE CASCADE NOT NULL,
-        token CHAR NOT NULL
-        )
+        entityID TEXT REFERENCES images (entityID) ON DELETE CASCADE NOT NULL,
+        token TEXT NOT NULL,
+        CONSTRAINT entity_token_unique UNIQUE(entityID, token) ON CONFLICT IGNORE,
+        CONSTRAINT entity_reference_image FOREIGN KEY (entityID) REFERENCES image ON DELETE CASCADE
+        ) STRICT
         """)
     cur.execute("""CREATE TABLE IF NOT EXISTS imageSize(
-        entityID REFERENCES images (entityID) ON DELETE CASCADE NOT NULL,
+        entityID TEXT REFERENCES images (entityID) ON DELETE CASCADE NOT NULL,
         WIDTH INTEGER NOT NULL CHECK (WIDTH >= 0),
         HEIGHT INTEGER NOT NULL CHECK (HEIGHT >= 0),
-        TYPE CHAR NOT NULL,
-        COMPONENT CHAR,
-        FILENAME CHAR,
-        RADIUS INTEGER NOT NULL
-        )
+        TYPE TEXT NOT NULL,
+        COMPONENT TEXT,
+        FILENAME TEXT,
+        RADIUS INTEGER NOT NULL,
+        CONSTRAINT entityID_width_height_unique UNIQUE(entityID,Width,Height,type,filename) ON CONFLICT IGNORE
+        ) STRICT
         """)
     con.commit()
     return con
@@ -50,10 +53,10 @@ def create_db(database) -> sqlite3.Connection:
 def update_file_times(db: sqlite3.Connection, directory_path, dry_run=False):
     rd = find_image_upload_data(db, directory_path)
     for path, create_time in rd:
-        _logger.info("%s will be updated to %s", path, create_time)
-        if create_time is not None:
-            # _logger.info("%s %s",path, datetime.datetime.fromtimestamp(create_time))
-            pass
+        if create_time is None:
+            _logger.warning("No time found for %s", path)
+        else:
+            _logger.info("%s will be updated to %s", path, create_time)
             if not dry_run:
                 os.utime(path=path, times=(create_time, create_time))
 
@@ -90,11 +93,12 @@ def find_image_publish_date(cur: sqlite3.Connection, image_file_name) -> None | 
 
 
 def find_markdown_publish_date(cur: sqlite3.Connection, markdown_file_name) -> None | float:
-    IMAGE = cur.execute("SELECT publishedDate,title FROM image WHERE pageTitle = ? LIMIT 1", [markdown_file_name]).fetchone()
+    IMAGE: None | tuple[str, str] = cur.execute(
+        "SELECT publishedDate,title FROM image WHERE pageTitle = ? LIMIT 1", [markdown_file_name]
+    ).fetchone()
     # print(IMAGE)
     if IMAGE:
-        TIME = IMAGE[0]
-        TIME = datetime.datetime.fromisoformat(TIME)
+        TIME = datetime.datetime.fromisoformat(IMAGE[0])
         # print(TIME)
         return TIME.timestamp()
     return None
@@ -120,12 +124,17 @@ def find_image_upload_data(cur: sqlite3.Connection, directory_path) -> Generator
                 _logger.warning("No time found for %s", full_path)
 
 
-def fill_with_json_data(db: sqlite3.Connection, directory_path, dry_run):
+def fill_with_json_data(db: sqlite3.Connection, directory_path, /, dry_run, max_depth):
 
     cur = db.cursor()
-    data = create_json_data(directory_path)
+    # data = create_json_data(directory_path, max_depth)
+    data = (
+        d
+        for json_obj in yield_json_from_directory(directory_path=directory_path, max_depth=max_depth)
+        for d in extract_items_from_json(json_obj)
+    )
     for image_data, token_data, size_data in data:
-        cur.execute(
+        _ = cur.execute(
             "INSERT INTO image "
             "(entityID,publishedDate,media,baseUri,prettyName,hasBlockReasons,shortUrl,Url,PageTitle,title)"
             "VALUES (?,?,?,?,?,?,?,?,?,?) "
@@ -133,9 +142,9 @@ def fill_with_json_data(db: sqlite3.Connection, directory_path, dry_run):
             image_data,
         )
         _logger.debug("Inserted row: %s", cur.lastrowid)
-        cur.executemany("INSERT INTO token (entityId,token) VALUES (?,?)", token_data)
+        _ = cur.executemany("INSERT INTO token (entityId,token) VALUES (?,?)", token_data)
 
-        cur.executemany(
+        _ = cur.executemany(
             "INSERT INTO imageSize (entityId,width,height,type,component,filename,radius) VALUES (?,?,?,?,?,?,?)",
             size_data,
         )
@@ -145,7 +154,7 @@ def fill_with_json_data(db: sqlite3.Connection, directory_path, dry_run):
         db.rollback()
 
 
-def create_json_data(directory_path):
+def create_json_data(directory_path, max_depth):
     directory_path = pathlib.Path(directory_path)
     assert directory_path.exists() and directory_path.is_dir()
     for a, b, c in os.walk(directory_path):
@@ -159,6 +168,29 @@ def create_json_data(directory_path):
                 except json.decoder.JSONDecodeError as e:
                     _logger.warning("JSON ERROR PARSING %s, %s", full_path, e.msg)
                     continue
+
+
+def yield_json_from_directory(directory_path, max_depth):
+
+    if max_depth <= 0:
+        return
+    directory_path = pathlib.Path(directory_path)
+    assert directory_path.exists() and directory_path.is_dir()
+    for a, b, c in os.walk(directory_path):
+        for p in c:
+            full_path = os.path.join(a, p)
+            _logger.info("Parsing %s", full_path)
+            with open(full_path, "r") as fp:
+                try:
+                    obj = json.load(fp)
+                    yield obj
+                except json.decoder.JSONDecodeError as e:
+                    _logger.warning("JSON ERROR PARSING %s, %s", full_path, e.msg)
+                    continue
+        for p in b:
+            full_path_dir = os.path.join(a, p)
+            _logger.info("Recursing into %s", full_path_dir)
+            yield from yield_json_from_directory(full_path_dir, max_depth=max_depth - 1)
 
 
 def extract_items_from_json(obj):
@@ -216,7 +248,7 @@ def read_db2(db: sqlite3.Connection):
     run_query(db, q)
 
 
-def run_query(db: sqlite3.Connection, query):
+def run_query(db: sqlite3.Connection, query: str):
     cur = db.cursor()
     for i, row in enumerate(cur.execute(query)):
         print(i, row, sep=": ")
@@ -232,6 +264,7 @@ def main():
     p.add_argument("--files", type=pathlib.Path)
     p.add_argument("--query", type=str)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--max-depth", type=int, default=1)
     parser.add_argument("--log-level", choices=logging._levelToName.values(), default="INFO")
 
     p2 = parser.add_mutually_exclusive_group(required=False)
@@ -250,7 +283,7 @@ def main():
     elif args.update_times:
         update_file_times(db, args.files, args.dry_run)
     else:
-        fill_with_json_data(db, args.files, args.dry_run)
+        fill_with_json_data(db, args.files, dry_run=args.dry_run, max_depth=args.max_depth)
         db.commit()
     db.close()
 

@@ -86,3 +86,48 @@ class JsonImagePreUrlExtractor(JsonImageUrlExtractor):
     def _image_size_order(self) -> list[str]:
         # preview is the one that is guaranteed to be not to large
         return ["preview"]
+
+
+class JsonImagePermutationExtractor(JsonImageUrlExtractor):
+    def construct_url_from_media(self, media):
+        baseUri: str = media.get("baseUri", "")
+        prettyName: str = media.get("prettyName", "")
+        tokens: list[str] = media.get("token", [])
+        if not baseUri or not prettyName:
+            _logger.debug("Missing baseUri or prettyName in %s", media)
+            return []
+        # if baseUri is None:
+        #     _logger.error("current media has no baseUri: %s", media)
+        # if prettyName is None:
+        #     _logger.error("current media has no prettyName: %s", media)
+        if not tokens:
+            _logger.warning("No tokens available for %s, %s", prettyName, baseUri)
+        tokens = [""] + ["?token=" + token for token in tokens]
+        types: list[dict] = media.get("types")
+
+        # fullviews = [t for x in self._image_size_order() for t in types if t.get("t") == x]
+        base_urls = []
+        for t in types:
+            _logger.info("%s", t)
+            if t.get("t") != "fullview":
+                continue
+
+            c1 = t.get("c", "")
+            url1 = baseUri + c1.replace("<prettyName>", prettyName or "")
+            base_urls.append(url1)
+            for ss in t.get("ss", []):
+                c2 = ss.get("c", "")
+                url2 = baseUri + c2.replace("<prettyName>", prettyName or "")
+                base_urls.append(url2)
+
+        all_urls = []
+        for a in base_urls:
+            for token in tokens:
+                all_urls.append(a + token)
+
+        return all_urls
+
+    def retrieve(self, input_path):  # pyright: ignore[reportIncompatibleMethodOverride]
+        urls = super().retrieve(input_path=input_path)
+        urls = [x for y in urls for x in y]
+        return urls
