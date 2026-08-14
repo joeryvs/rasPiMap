@@ -1,17 +1,10 @@
 import argparse
-import io
+import datetime
 import json
 import logging
-import multiprocessing
 import os
-import pathlib
-import subprocess
-import sys
-import threading
 import time
-from re import T
-from typing import Any
-from uuid import uuid4
+from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 from utils import find_key_rec, find_keys_rec
@@ -20,9 +13,10 @@ _logger = logging.getLogger(__name__)
 
 
 class YtPostScraper:
-    def __init__(self, base_dir, graft_url) -> None:
+    def __init__(self, base_dir: str, graft_url: str, /, wait_time: float = 5.0) -> None:
         self._base_dir: str = base_dir
         self.graft_url: str = graft_url
+        self.wait_time: float = wait_time
 
         assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
             "Scraping store directory does not exist"
@@ -103,28 +97,26 @@ class YtPostScraper:
             "continuation": continuation,
         }
 
-    def run_curl_command2(self, continuation: str, tracking_param: str, index: int = 0):
+    def download_continuation_json(self, continuation: str, tracking_param: str, index: int):
         DATARAW = self.get_data_raw(continuation=continuation, tracking_param=tracking_param)
         dataraw = json.dumps(DATARAW, allow_nan=False, check_circular=True, ensure_ascii=True)
-        args = [
-            "curl",
-            "--url",
-            "https://www.youtube.com/youtubei/v1/browse?prettyPrint=false",
-            "-H",
-            "content-type: application/json",
-            "-H",
-            "origin: https://www.youtube.com",
-            "-H",
-            "user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-            # "-b",
-            # "YSC=L1QSODVcqb8; PREF=tz=Europe.Amsterdam; SOCS=CAISEwgDEgk5NjMxMDU5OTgaAm5sIAEaBgiAkvTTBg; VISITOR_INFO1_LIVE=oLwvk0UT5P0; VISITOR_PRIVACY_METADATA=CgJOTBIiEh4SHAsMDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicgIw%3D%3D; __Secure-YNID=20.YT=T79a7URVGMA19XglX-PPALj9VahOYwyHRE9GCjF3CtbzvmTmfhknH6DbXBRsr67gG3tgrbr8O37bS8y-u1VcdQU-OmHap0R-0F5nI1F0-atIwuXXoZ1mYnBJu0ZId4zbmzEtB2-M82z5SrQTfVjGdG9zpUXl6QwShudSkp9n9b-I0azXvXw-4Izv3COpelG_DD03bSDttj_kGhFhgJ1nF2d5HbhtSqU_NEtuZAyiN1PF9NpyfTJl2F2YYlacOAyDpMP24d6f5gI68-I1lqgRSWPzcDd8u1cAkhduuNeqhfs8kCgnMrXzP_5Drer9qnIbufJQx2ZHmZ3t-g4UQPb7WA; GPS=1; __Secure-ROLLOUT_TOKEN=CJKHgoO766SqQhCwqczPy52WAxiyy-TPy52WAw%3D%3D; ST-1vpkvfn=itct=CCUQ8JMBGAsiEwjP_ujZy52WAxUCd3oFHU9AGC3KAQQ0k1NP&csn=MuNdyR90q1h2JPTE&endpoint=%7B%22clickTrackingParams%22%3A%22CCUQ8JMBGAsiEwjP_ujZy52WAxUCd3oFHU9AGC3KAQQ0k1NP%22%2C%22commandMetadata%22%3A%7B%22webCommandMetadata%22%3A%7B%22url%22%3A%22%2F%40IGN%2Fposts%22%2C%22webPageType%22%3A%22WEB_PAGE_TYPE_CHANNEL%22%2C%22rootVe%22%3A3611%2C%22apiUrl%22%3A%22%2Fyoutubei%2Fv1%2Fbrowse%22%7D%7D%2C%22browseEndpoint%22%3A%7B%22browseId%22%3A%22UCKy1dAqELo0zrOtPkf0eTMw%22%2C%22params%22%3A%22EgVwb3N0c_IGBAoCSgA%253D%22%2C%22canonicalBaseUrl%22%3A%22%2F%40IGN%22%7D%7D",
-            "--data-raw",
-            dataraw,
-        ]
+
+        req = Request("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false")
+        req.add_header("content-type", "application/json")
+        req.add_header("origin", "https://www.youtube.com")
+        req.add_header(
+            "user-agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        )
+
+        with urlopen(req, data=dataraw.encode()) as res:
+            data = res.read()
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
+                _logger.warning("Decoding data, res options are %s", dir(res))
         out_path = os.path.join(self._base_dir, f"out_{index}.txt")
-        err_path = os.path.join(self._base_dir, f"err_{index}.txt")
-        with open(out_path, "w") as f_out, open(err_path, "w") as f_err:
-            _ = subprocess.run(args=args, check=True, stdout=f_out, stderr=f_err)
+        with open(out_path, "w") as f_out:
+            f_out.write(data)
 
         return out_path
 
@@ -135,7 +127,7 @@ class YtPostScraper:
         index = 1
         while 1:
             print(index, c, t)
-            out_path = self.run_curl_command2(c, t, index)
+            out_path = self.download_continuation_json(c, t, index)
             with open(out_path, "r") as fp:
                 data = json.load(fp=fp)
 
@@ -151,22 +143,14 @@ class YtPostScraper:
 
             assert c is not None
             index += 1
-            time.sleep(3)
-            print(data)
-            time.sleep(2)
+            time.sleep(self.wait_time)
 
     def download_page(self):
-
-        from urllib.request import urlopen
 
         with urlopen(self.graft_url, timeout=3000) as f:
             data = f.read()
 
         return data
-        # path = "test.html"
-        # with open(path, "r") as f:
-        # data = f.read()
-        # return data
 
     def retrieve_contiunationcommand_and_tracking_param_from_soup(self, soup):
 
@@ -184,26 +168,6 @@ class YtPostScraper:
             _logger.error("Non of the scripts define the variable ytInitialData")
         value = str(scripts[0].text.removesuffix(";").removeprefix("var ytInitialData = "))
         json_obj = json.loads(value)
-        # keys_to_continuation_token = [
-        #     "contents",
-        #     "twoColumnBrowseResultsRenderer",
-        #     "tabs",
-        #     -1,
-        #     "tabRenderer",
-        #     "content",
-        #     "sectionListRenderer",
-        #     "contents",
-        #     0,
-        #     "itemSectionRenderer",
-        #     "contents",
-        #     -1,
-        #     "continuationItemRenderer",
-        #     "continuationEndpoint",
-        #     "continuationCommand",
-        #     "token",
-        # ]
-        # ['header', 'pageHeaderRenderer', 'content', 'pageHeaderViewModel', 'description', 'descriptionPreviewViewModel', 'rendererContext', 'commandContext', 'onTap', 'innertubeCommand', 'showEngagementPanelEndpoint', 'engagementPanel', 'engagementPanelSectionListRenderer', 'content', 'sectionListRenderer', 'contents', 0, 'itemSectionRenderer', 'contents', 0, 'continuationItemRenderer', 'continuationEndpoint', 'continuationCommand']
-        # ['header', 'pageHeaderRenderer', 'content', 'pageHeaderViewModel', 'attribution', 'attributionViewModel', 'suffix', 'commandRuns', 0, 'onTap', 'innertubeCommand', 'showEngagementPanelEndpoint', 'engagementPanel', 'engagementPanelSectionListRenderer', 'content', 'sectionListRenderer', 'contents', 0, 'itemSectionRenderer', 'contents', 0, 'continuationItemRenderer', 'continuationEndpoint', 'continuationCommand']
         # Step 3 find and return the continuationCommand
         # command = json_obj
         command = find_key_rec(json_obj, "continuationCommand")[1]["token"]
@@ -237,16 +201,21 @@ def main():
     tracking_param = "CCcQuy8YACITCOOa8dvLnZYDFWHCSQcdi_w6IMoBBDSTU08="
     graft_url = "https://www.youtube.com/@IGN/posts"
     parser = argparse.ArgumentParser()
-    parser.add_argument("-P", "--directory-prefix", type=str, default=".")
-    parser.add_argument("graft_url")
+    parser.add_argument("-P", "--directory-prefix", type=str)
+    parser.add_argument("--wait-times", type=float, default=5)
+
+    parser.add_argument("user")
 
     args = parser.parse_args()
-    if args.graft_url:
-        graft_url = f"https://www.youtube.com/@{args.graft_url.strip().removeprefix('@')}/posts"
 
-    os.makedirs(args.directory_prefix, exist_ok=True)
+    graft_url = f"https://www.youtube.com/@{args.user.strip().removeprefix('@')}/posts"
+    directory_prefix = "."
+    if not args.directory_prefix:
+        directory_prefix = datetime.datetime.now().strftime("{}-%Y-%j").format(args.user)
 
-    scraper = YtPostScraper(args.directory_prefix, graft_url)
+    os.makedirs(directory_prefix, exist_ok=True)
+
+    scraper = YtPostScraper(directory_prefix, graft_url, wait_time=args.wait_times)
     scraper.run()
 
 
