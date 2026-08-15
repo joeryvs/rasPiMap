@@ -5,32 +5,29 @@ import json
 import logging
 import os
 import time
+from abc import ABC, abstractmethod
 from urllib.request import Request, urlopen
 
+import requests
 from bs4 import BeautifulSoup
 from utils import find_key_rec, find_keys_rec
 
 _logger = logging.getLogger(__name__)
 
 
+class State(ABC):
+    @abstractmethod
+    def get_data_raw(self):
+        pass
+
+
 @dataclasses.dataclass(frozen=True)
-class YtState:
+class YtState(State):
     continuationToken: str
     trackingParams: str
     graft_url: str
 
-
-class YtPostScraper:
-    def __init__(self, base_dir: str, graft_url: str, /, wait_time: float = 5.0) -> None:
-        self._base_dir: str = base_dir
-        self.graft_url: str = graft_url
-        self.wait_time: float = wait_time
-
-        assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
-            "Scraping store directory does not exist"
-        )
-
-    def get_data_raw(self, continuation: str, tracking_param: str):
+    def get_data_raw(self):
         return {
             "context": {
                 "client": {
@@ -79,7 +76,7 @@ class YtPostScraper:
                 },
                 "user": {"lockedSafetyMode": False},
                 "request": {"useSsl": True, "internalExperimentFlags": [], "consistencyTokenJars": []},
-                "clickTracking": {"clickTrackingParams": tracking_param},
+                "clickTracking": {"clickTrackingParams": self.trackingParams},
                 "adSignalsInfo": {
                     "params": [
                         {"key": "dt", "value": "1786623616795"},
@@ -102,20 +99,24 @@ class YtPostScraper:
                     ]
                 },
             },
-            "continuation": continuation,
+            "continuation": self.continuationToken,
         }
 
-    def download_continuation_json(self, continuation: str, tracking_param: str, index: int):
-        DATARAW = self.get_data_raw(continuation=continuation, tracking_param=tracking_param)
-        dataraw = json.dumps(DATARAW, allow_nan=False, check_circular=True, ensure_ascii=True)
 
-        req = Request("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false")
-        req.add_header("content-type", "application/json")
-        req.add_header("origin", "https://www.youtube.com")
-        req.add_header(
-            "user-agent",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-        )
+class AbstractScraper(ABC):
+    @property
+    @abstractmethod
+    def base_dir(self) -> str:
+        pass
+
+    def get_download_continuation_request(self):
+        pass
+
+    def download_continuation_json(self, state: State, index: int) -> str:
+        DATARAW = state.get_data_raw()
+        dataraw = json.dumps(DATARAW, allow_nan=False, check_circular=True, ensure_ascii=True)
+        # TODO replace with requests package
+        req = self.get_download_continuation_request()
 
         with urlopen(req, data=dataraw.encode()) as res:
             data = res.read()
@@ -123,20 +124,47 @@ class YtPostScraper:
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
                 _logger.warning("Decoding data, res options are %s", dir(res))
-        out_path = os.path.join(self._base_dir, f"out_{index}.txt")
+        out_path = os.path.join(self.base_dir, f"out_{index}.txt")
         with open(out_path, "w") as f_out:
             f_out.write(data)
 
         return out_path
 
+
+class YtPostScraper(AbstractScraper):
+    def __init__(self, base_dir: str, graft_url: str, /, wait_time: float = 5.0) -> None:
+        self._base_dir: str = base_dir
+        self.graft_url: str = graft_url
+        self.wait_time: float = wait_time
+
+        assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
+            "Scraping store directory does not exist"
+        )
+    # OVERRIDES
+    @property
+    def base_dir(self):
+        return self._base_dir
+
+    def get_download_continuation_request(self):
+        req = Request("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false")
+
+        req.add_header("content-type", "application/json")
+        req.add_header("origin", "https://www.youtube.com")
+        req.add_header(
+            "user-agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        )
+
+        return req
+
+    # NEW METHODS
     def runloop(self, continuation: str, tracking_params: str):
 
-        c, t = continuation, tracking_params
-
+        state = YtState(continuation,tracking_params,self.graft_url)
         index = 1
         while 1:
-            print(index, c, t)
-            out_path = self.download_continuation_json(c, t, index)
+            print(index, state)
+            out_path = self.download_continuation_json(state, index)
             with open(out_path, "r") as fp:
                 data = json.load(fp=fp)
 
@@ -146,12 +174,13 @@ class YtPostScraper:
             p, c2 = ans
             print(p)
             print(c2)
-            # Get new token and trackingParams
+            # Get new token and trackingParams and build a new State
             c = c2.get("token")
             t = data.get("trackingParams")
 
             assert c is not None
             index += 1
+            state = YtState(c,t,self.graft_url)
             time.sleep(self.wait_time)
 
     def download_page(self):
@@ -201,6 +230,7 @@ class YtPostScraper:
         self.runloop(c, t)
 
     def run_stack(self):
+        raise Exception("STupid method")
         html_data = self.download_page()
         soup = BeautifulSoup(html_data, features="html.parser")
         ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)

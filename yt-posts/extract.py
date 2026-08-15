@@ -18,6 +18,7 @@ def extract_crop_image_urls(obj):
 
 
 def get_files(files: str) -> list[str]:
+    """Retrieve a list of valid files that can be read"""
     if os.path.isdir(files):
         ans: list[str] = []
         for a in os.walk(files):
@@ -42,8 +43,9 @@ def get_urls_from_json_files(file: str):
             _logger.warning("Not valid JSON %s", file)
 
 
-def run(files: str, output):
+def run(files: str, output, func=None):
     for url in get_by_pattern(files, "https://yt3.ggpht.com"):
+        url = url if func is None else func(url)
         print(url, file=output)
 
 
@@ -54,17 +56,31 @@ def get_by_pattern(files: str, pattern: str):
                 yield url
 
 
+def post_modify_runction(url: str) -> str:
+    # vim macro is 0nllc9e4000 + Esc + j0
+    # now as a python function
+    parts = url.split("=s")
+    assert len(parts) == 2
+    begin, end = parts
+    x = end.split("-")
+    x[0] = "4000"
+    x[1:3] = []
+    return f"{begin}=s{'-'.join(x)}"
+
+
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--strict", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--post-process", action=argparse.BooleanOptionalAction)
     parser.add_argument("-i", "--input-file", required=True)
     parser.add_argument("-o", "--output", default="-")
 
     args = parser.parse_args()
 
-    output = sys.stdout if args.output == "-" else open(args.output, "a")
-    run(args.input_file, output)
+    func = post_modify_runction if args.post_process else None
+    with sys.stdout if args.output == "-" else open(args.output, "a") as output:
+        run(args.input_file, func=func, output=output)
 
 
 if __name__ == "__main__":
