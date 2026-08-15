@@ -1,4 +1,5 @@
 import argparse
+import dataclasses
 import datetime
 import json
 import logging
@@ -10,6 +11,13 @@ from bs4 import BeautifulSoup
 from utils import find_key_rec, find_keys_rec
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass(frozen=True)
+class YtState:
+    continuationToken: str
+    trackingParams: str
+    graft_url: str
 
 
 class YtPostScraper:
@@ -111,6 +119,7 @@ class YtPostScraper:
 
         with urlopen(req, data=dataraw.encode()) as res:
             data = res.read()
+            # TODO get actual encoding
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
                 _logger.warning("Decoding data, res options are %s", dir(res))
@@ -181,7 +190,7 @@ class YtPostScraper:
         return command, trackingParams
 
     def run(self):
-
+        """Download page and start an iterative loop"""
         html_data = self.download_page()
         soup = BeautifulSoup(html_data, features="html.parser")
         ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
@@ -189,19 +198,52 @@ class YtPostScraper:
             _logger.error("No tokens found")
             return
         c, t = ans1
-
-        print(c)
-        print(t)
         self.runloop(c, t)
+
+    def run_stack(self):
+        html_data = self.download_page()
+        soup = BeautifulSoup(html_data, features="html.parser")
+        ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
+        if not ans1:
+            _logger.error("No tokens found")
+            return
+        c, t = ans1
+        begin_state = YtState(continuationToken=c, trackingParams=t, graft_url=self.graft_url)
+
+        seen = set()
+        todos = [begin_state]
+
+        index = 0
+        while todos:
+            state = todos.pop()
+            if state in seen:
+                continue
+            seen.add(state)
+            index += 1
+            c = state.continuationToken
+            t = state.trackingParams
+            print(index, c, t, len(todos))
+            out_path = self.download_continuation_json(c, t, index)
+            with open(out_path, "r") as fp:
+                data = json.load(fp=fp)
+
+            # print(data)
+            # Get new token and trackingParams
+            t = data.get("trackingParams")
+            ans = find_keys_rec(data, "continuationCommand", with_path=True)
+            for p, c2 in ans:
+                print(c2)
+                if isinstance(c2, dict):
+                    new_state = YtState(continuationToken=c2.get("token"), trackingParams=t, graft_url=self.graft_url)
+                    todos.append(new_state)
+            time.sleep(self.wait_time)
 
 
 def main():
-    c2ntinuation = "4qmFsgKBARIYVUNLeTFkQXFFTG8wenJPdFBrZjBlVE13GkxFZ1Z3YjNOMGM2b0RLQW9rVVRKb1ExSkdUWHBqUm14TlZrZDRTMVZxUWxkVE1VcEdZVWhDWVZKdGVFWlNWVVpDS0JUeUJnUUtBa29BmgIWYmFja3N0YWdlLWl0ZW0tc2VjdGlvbg%3D%3D"
-    continuation = "4qmFsgKBARIYVUNLeTFkQXFFTG8wenJPdFBrZjBlVE13GkxFZ1Z3YjNOMGM2b0RLQW9rVVRKb1ExSkdWa2hqUkZacFlsWktUMVZxUWxkVlZrcEZVVlJTV0dKR1drUlNWVVpDS0FyeUJnUUtBa29BmgIWYmFja3N0YWdlLWl0ZW0tc2VjdGlvbg%3D%3D"
-    tracking_param = "CCcQuy8YACITCOOa8dvLnZYDFWHCSQcdi_w6IMoBBDSTU08="
-    graft_url = "https://www.youtube.com/@IGN/posts"
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-P", "--directory-prefix", type=str)
+    parser.add_argument("--stack", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--wait-times", type=float, default=5)
 
     parser.add_argument("user")
@@ -209,14 +251,16 @@ def main():
     args = parser.parse_args()
 
     graft_url = f"https://www.youtube.com/@{args.user.strip().removeprefix('@')}/posts"
-    directory_prefix = "."
+    directory_prefix = args.directory_prefix
     if not args.directory_prefix:
         directory_prefix = datetime.datetime.now().strftime("{}-%Y-%j").format(args.user)
 
     os.makedirs(directory_prefix, exist_ok=True)
-
     scraper = YtPostScraper(directory_prefix, graft_url, wait_time=args.wait_times)
-    scraper.run()
+    if args.stack:
+        scraper.run_stack()
+    else:
+        scraper.run()
 
 
 if __name__ == "__main__":

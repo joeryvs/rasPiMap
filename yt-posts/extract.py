@@ -17,36 +17,9 @@ def extract_crop_image_urls(obj):
             yield b
 
 
-# Just unneeded
-def extract_crop_image_urls2(obj):
-    continuationItems = obj["onResponseReceivedEndpoints"][0]["appendContinuationItemsAction"]["continuationItems"]
-    for ci in continuationItems:
-        print(ci.keys())
-        ci = ci.get("backstagePostThreadRenderer")
-        if ci is None:
-            continue
-        print(ci.keys())
-        ci = ci["post"]
-        print(ci.keys())
-        ci = ci.get("backstagePostRenderer")
-        if ci is None:
-            continue
-        print(ci.keys())
-        ci = ci["backstageAttachment"]
-        print(ci.keys())
-        ci = ci.get("backstageImageRenderer")
-        if ci is None:
-            continue
-        print(ci.keys())
-        ci = ci["image"]
-        thumbnails = ci["thumbnails"]
-        for t in thumbnails:
-            yield t["url"]
-
-
-def get_files(files):
+def get_files(files: str) -> list[str]:
     if os.path.isdir(files):
-        ans = []
+        ans: list[str] = []
         for a in os.walk(files):
             dir_path, _others_dirs, target_files = a
             for x in target_files:
@@ -59,19 +32,26 @@ def get_files(files):
         return []
 
 
-def run(files, output):
-
-    for f in get_files(files):
+def get_urls_from_json_files(file: str):
+    with open(file, "r") as fp:
         try:
-            with open(f, "r") as fp:
-                data = json.load(fp=fp)
-                # WE use the slow brute foree solution
-                for cui in extract_crop_image_urls(data):
-                    print(cui, file=output)
-        except json.JSONDecodeError:
-            _logger.warning("not valid JSON %s", f)
-        finally:
-            pass
+            data = json.load(fp=fp)
+            for url in find_keys_rec(data, "url", False):
+                yield url
+        except json.json.JSONDecodeError:
+            _logger.warning("Not valid JSON %s", file)
+
+
+def run(files: str, output):
+    for url in get_by_pattern(files, "https://yt3.ggpht.com"):
+        print(url, file=output)
+
+
+def get_by_pattern(files: str, pattern: str):
+    for f in get_files(files):
+        for url in get_urls_from_json_files(f):
+            if url.startswith(pattern):
+                yield url
 
 
 def main():
