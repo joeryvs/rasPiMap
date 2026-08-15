@@ -78,8 +78,10 @@ deviant/Art-Pages/
 !requirements.txt
 
 *.jpg
+*.jpeg
 *.png
 *.gif
+*.webp
 *.png.*
 *.txt.*
 

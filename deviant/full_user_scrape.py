@@ -10,6 +10,7 @@ from extractors import (
     DescriptionExtractor,
     HighestUserExtractor,
     JsonExtractor,
+    JsonImagePreUrlExtractor,
     MainImageExtractor,
     StoryExtractor,
     TagPageExtractor,
@@ -19,21 +20,39 @@ from utils import FileWriter, IOWriter, Reader
 _logger = logging.getLogger(__name__)
 
 
+def wget_download(input_file: str, directory_prefix: str, wait_time: float, check: bool = True):
+    # Download the image with wget
+    rejected_log = "rejected_log.log"
+    open(rejected_log, "a").close()
+    cmd = ["wget", "--input-file", input_file, "--directory-prefix", directory_prefix]
+    if wait_time:
+        cmd.extend(["--wait", str(wait_time), "--random_wait"])
+
+    cmd.extend(["--no-verbose", "--rejected-log", rejected_log])
+    try:
+        p = subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, check=check)
+        _logger.info("Process %s, end with code %s", p.args, p.returncode)
+    except subprocess.CalledProcessError as e:
+        _logger.error("Process %s Error with code %s", e.args, e.returncode)
+
+
 def run(
     user: str,
-    *,
+    /,
     wait_pages: float,
     wait_images: float,
     skip_gallary_download: bool,
     skip_pages_download: bool,
     skip_image_download: bool,
+    download_from_gallary: bool,
     post_process: bool,
 ):
     _logger.info("running process for %s", user)
     _logger.info(
-        "skip gallary : %s, skip pages : %s, skip image : %s, post process %s",
+        "skip gallary : %s, skip pages : %s, download from gallary %s, skip image : %s, post process %s",
         skip_gallary_download,
         skip_pages_download,
+        download_from_gallary,
         skip_image_download,
         post_process,
     )
@@ -51,6 +70,28 @@ def run(
         _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
         subprocess.run(["gallary-pages/scrape_user.sh", user, AMOUNT], check=True)
     gal_pages = f"gallary-pages/{user}/"
+    if download_from_gallary:
+        json_pre_image = f"{user}_json_pre_image.txt"
+        JsonImagePreUrlExtractor(reader=reader, writer=FileWriter(json_pre_image)).extract(
+            gal_page, sort=True, unique=True
+        )
+        dir_pre = f"{user}_pre"
+        wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
+        # Extract JSON from GAllARY
+        dir_json_gal = f"{user}_gal_json"
+        JsonExtractor(reader=reader, writer=FileWriter(dir_json_gal)).extract(input_path=gal_pages)
+
+        if post_process:
+            user_gal_db = f"{user}_gal.sqlite"
+            db = create_db(user_gal_db)
+
+            fill_with_json_data(db, dir_json_gal, dry_run=False, max_depth=1)
+            # update the time stamps on story/description/json and image
+            for p in [dir_pre]:
+                if os.path.isdir(p):
+                    update_file_times(db, p, dry_run=False)
+        return
+
     art_pages_link_file = f"{user}_art.txt"
     art_pages = f"Art-Pages/{user}_art/"
     if not skip_pages_download:
@@ -58,23 +99,8 @@ def run(
         ArtPageExtractor(reader=reader, writer=FileWriter(art_pages_link_file)).extract(
             gal_pages, sort=True, unique=True
         )
-        _ = subprocess.run(
-            [
-                "wget",
-                "--input-file",
-                art_pages_link_file,
-                "--directory-prefix",
-                art_pages,
-                "--wait",
-                str(wait_pages),
-                "--random-wait",
-                "--no-verbose",
-            ],
-            stdin=sys.stdin,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            check=True,
-        )
+
+        wget_download(input_file=art_pages_link_file, directory_prefix=art_pages, wait_time=wait_pages)
     dir_desc = f"{user}_desc"
     dir_story = f"{user}_story"
     dir_json = f"{user}_json"
@@ -93,26 +119,8 @@ def run(
         TagPageExtractor(reader=reader, writer=FileWriter(f"{user}_tag.txt")).extract(input_path=art_pages)
         ArtPageExtractor(reader=reader, writer=FileWriter(f"{user}_outgoing_art.txt")).extract(input_path=art_pages)
         # Download the image with wget
-        rejected_log = "rejected_log.log"
-        open(rejected_log, "a").close()
-        cmd = [
-            "wget",
-            "--input-file",
-            main_image,
-            "--directory-prefix",
-            dir_main,
-            "--wait",
-            str(wait_images),
-            "--random-wait",
-            "--no-verbose",
-            "--rejected-log",
-            rejected_log,
-        ]
-        try:
-            p = subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, check=True)
-            _logger.info("Process %s, end with code %s", p.args, p.returncode)
-        except subprocess.CalledProcessError as e:
-            _logger.error("Process %s Error with code %s", e.args, e.returncode)
+
+        wget_download(input_file=main_image, directory_prefix=dir_main, wait_time=wait_images)
 
         # remove the query parameter
         _ = subprocess.run(["../remove_post.sh", dir_main], check=True, capture_output=True)
@@ -121,7 +129,7 @@ def run(
     if post_process:
         db = create_db(user_db)
 
-        fill_with_json_data(db, dir_json, dry_run=False)
+        fill_with_json_data(db, dir_json, dry_run=False, max_depth=1)
         # update the time stamps on story/description/json and image
         for p in [dir_desc, dir_story, dir_main, dir_json]:
             if os.path.isdir(p):
@@ -137,6 +145,7 @@ def main():
     parser.add_argument("--skip-gallary-download", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--skip-pages-download", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--skip-image-download", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--download-from-gallary", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--post-process", action=argparse.BooleanOptionalAction, default=False)
 
     parser.add_argument("--wait-pages", type=float, default=6.0)
@@ -151,6 +160,7 @@ def main():
         skip_gallary_download=args.skip_gallary_download,
         skip_pages_download=args.skip_pages_download,
         skip_image_download=args.skip_image_download,
+        download_from_gallary=args.download_from_gallary,
         post_process=args.post_process,
     )
 
