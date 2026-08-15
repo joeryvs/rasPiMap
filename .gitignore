@@ -84,6 +84,7 @@ deviant/Art-Pages/
 *.webp
 *.png.*
 *.txt.*
+*.log
 
 play/temp*/
 

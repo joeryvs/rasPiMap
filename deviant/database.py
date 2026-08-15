@@ -61,46 +61,26 @@ def update_file_times(db: sqlite3.Connection, directory_path, dry_run=False):
                 os.utime(path=path, times=(create_time, create_time))
 
 
-def find_image_publish_date(cur: sqlite3.Connection, image_file_name) -> None | float:
-    # TODO, USE 1 QUERY with a join statement
-    # t2 = cur.execute(
-    #     """SELECT im.publishedDate, im.title,isize.width,isize.height,isize.entityID,im.entityID FROM image AS im
-    #         RIGHT JOIN imageSize AS isize ON isize.entityID = im.entityID
-    #         WHERE
-    #         isize.FILENAME = ?
-    #         -- AND isize.entityID = im.entityID
-    #         LIMIT 1
-    #     """,
-    #     [file_name],
-    # )
-    # print(t2.fetchmany(100))
-    # continue
-    IMAGE_SIZE = cur.execute(
-        "SELECT entityID,type, filename FROM imageSize as isize where isize.filename = ? LIMIT 1", [image_file_name]
+def find_image_publish_date(cur: sqlite3.Connection, image_file_name) -> None | datetime.datetime:
+
+    IMAGE = cur.execute(
+        "SELECT image.publishedDate, image.title, image.shortUrl, imageSize.width, imageSize.height \
+        FROM image AS image JOIN imagesize AS imageSize ON image.entityID = imageSize.entityID \
+        WHERE imageSize.filename = ? \
+        LIMIT 1",
+        [image_file_name],
     ).fetchone()
-    # print(IMAGE_SIZE)
-    # input()
-    # continue
-    if IMAGE_SIZE:
-        enityID = IMAGE_SIZE[0]
-        IMAGE = cur.execute("SELECT publishedDate,title FROM image WHERE entityID = ? LIMIT 1", [enityID]).fetchone()
-        # print(IMAGE)
-        if IMAGE:
-            TIME = IMAGE[0]
-            TIME = datetime.datetime.fromisoformat(TIME)
-            return TIME.timestamp()
+    if IMAGE:
+        return datetime.datetime.fromisoformat(IMAGE[0])
     return None
 
 
-def find_markdown_publish_date(cur: sqlite3.Connection, markdown_file_name) -> None | float:
+def find_markdown_publish_date(cur: sqlite3.Connection, markdown_file_name) -> None | datetime.datetime:
     IMAGE: None | tuple[str, str] = cur.execute(
         "SELECT publishedDate,title FROM image WHERE pageTitle = ? LIMIT 1", [markdown_file_name]
     ).fetchone()
-    # print(IMAGE)
     if IMAGE:
-        TIME = datetime.datetime.fromisoformat(IMAGE[0])
-        # print(TIME)
-        return TIME.timestamp()
+        return datetime.datetime.fromisoformat(IMAGE[0])
     return None
 
 
@@ -119,7 +99,7 @@ def find_image_upload_data(cur: sqlite3.Connection, directory_path) -> Generator
             else:
                 TIME = find_image_publish_date(cur, file_name)
             if TIME is not None:
-                yield full_path, TIME
+                yield full_path, TIME.timestamp()
             else:
                 _logger.warning("No time found for %s", full_path)
 

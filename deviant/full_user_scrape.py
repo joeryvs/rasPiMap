@@ -26,11 +26,11 @@ def wget_download(input_file: str, directory_prefix: str, wait_time: float, chec
     open(rejected_log, "a").close()
     cmd = ["wget", "--input-file", input_file, "--directory-prefix", directory_prefix]
     if wait_time:
-        cmd.extend(["--wait", str(wait_time), "--random_wait"])
+        cmd.extend(["--wait", str(wait_time), "--random-wait"])
 
     cmd.extend(["--no-verbose", "--rejected-log", rejected_log])
     try:
-        p = subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, check=check)
+        p = subprocess.run(cmd, capture_output=True, check=check)
         _logger.info("Process %s, end with code %s", p.args, p.returncode)
     except subprocess.CalledProcessError as e:
         _logger.error("Process %s Error with code %s", e.args, e.returncode)
@@ -73,10 +73,12 @@ def run(
     if download_from_gallary:
         json_pre_image = f"{user}_json_pre_image.txt"
         JsonImagePreUrlExtractor(reader=reader, writer=FileWriter(json_pre_image)).extract(
-            gal_page, sort=True, unique=True
+            gal_pages, sort=True, unique=True
         )
         dir_pre = f"{user}_pre"
         wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
+        # remove the query parameter
+        _ = subprocess.run(["../remove_post.sh", dir_main], check=True, capture_output=True)
         # Extract JSON from GAllARY
         dir_json_gal = f"{user}_gal_json"
         JsonExtractor(reader=reader, writer=FileWriter(dir_json_gal)).extract(input_path=gal_pages)
