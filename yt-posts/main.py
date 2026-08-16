@@ -104,31 +104,17 @@ class YtState(State):
 
 
 class AbstractScraper(ABC):
-    @property
     @abstractmethod
-    def base_dir(self) -> str:
+    def get_download_continuation_request(self, state: State) -> requests.Response:
         pass
 
-    def get_download_continuation_request(self):
-        pass
+    def download_continuation_json(self, state: State):
 
-    def download_continuation_json(self, state: State, index: int) -> str:
-        DATARAW = state.get_data_raw()
-        dataraw = json.dumps(DATARAW, allow_nan=False, check_circular=True, ensure_ascii=True)
-        # TODO replace with requests package
-        req = self.get_download_continuation_request()
-
-        with urlopen(req, data=dataraw.encode()) as res:
-            data = res.read()
-            # TODO get actual encoding
-            if isinstance(data, bytes):
-                data = data.decode("utf-8")
+        with self.get_download_continuation_request(state=state) as res:
+            data = res.json()
+            if data is None:
                 _logger.warning("Decoding data, res options are %s", dir(res))
-        out_path = os.path.join(self.base_dir, f"out_{index}.txt")
-        with open(out_path, "w") as f_out:
-            f_out.write(data)
-
-        return out_path
+            return data
 
 
 class YtPostScraper(AbstractScraper):
@@ -140,47 +126,52 @@ class YtPostScraper(AbstractScraper):
         assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
             "Scraping store directory does not exist"
         )
+
     # OVERRIDES
     @property
     def base_dir(self):
         return self._base_dir
 
-    def get_download_continuation_request(self):
-        req = Request("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false")
-
-        req.add_header("content-type", "application/json")
-        req.add_header("origin", "https://www.youtube.com")
-        req.add_header(
-            "user-agent",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    def get_download_continuation_request(self, state: State) -> requests.Response:
+        DATARAW = state.get_data_raw()
+        return requests.post(
+            url="https://www.youtube.com/youtubei/v1/browse",
+            params={"prettyPrint": "false"},
+            timeout=3000,
+            headers={
+                "origin": "https://www.youtube.com",
+                "content-type": "application/json",
+                "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+            },
+            json=DATARAW,
         )
-
-        return req
 
     # NEW METHODS
     def runloop(self, continuation: str, tracking_params: str):
 
-        state = YtState(continuation,tracking_params,self.graft_url)
+        state = YtState(continuation, tracking_params, self.graft_url)
         index = 1
         while 1:
-            print(index, state)
-            out_path = self.download_continuation_json(state, index)
-            with open(out_path, "r") as fp:
-                data = json.load(fp=fp)
+            _logger.info("Iteration: %s, currentState: %s", index, state)
+            json_obj = self.download_continuation_json(state)
+            # save the JSON for later
+            out_path = os.path.join(self.base_dir, f"out_{index}.json")
+            with open(out_path, "w") as f_out:
+                json.dump(fp=f_out, obj=json_obj, indent=2)
 
-            ans = find_key_rec(data, "continuationCommand")
+            ans = find_key_rec(json_obj, "continuationCommand")
             if ans is None:
                 break
             p, c2 = ans
-            print(p)
-            print(c2)
+            _logger.debug("Path to continuation command: %s", p)
+            _logger.debug("continuationCommand: %s", c2)
             # Get new token and trackingParams and build a new State
             c = c2.get("token")
-            t = data.get("trackingParams")
+            t = json_obj.get("trackingParams")
 
             assert c is not None
             index += 1
-            state = YtState(c,t,self.graft_url)
+            state = YtState(c, t, self.graft_url)
             time.sleep(self.wait_time)
 
     def download_page(self):
