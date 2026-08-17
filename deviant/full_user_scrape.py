@@ -17,6 +17,7 @@ from extractors import (
 )
 from utils import FileWriter, IOWriter, Reader
 
+VERSION = "1.0"
 _logger = logging.getLogger(__name__)
 
 
@@ -30,7 +31,7 @@ def wget_download(input_file: str, directory_prefix: str, wait_time: float, chec
 
     cmd.extend(["--no-verbose", "--rejected-log", rejected_log])
     try:
-        p = subprocess.run(cmd, capture_output=True, check=check)
+        p = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr, check=check)
         _logger.info("Process %s, end with code %s", p.args, p.returncode)
     except subprocess.CalledProcessError as e:
         _logger.error("Process %s Error with code %s", e.args, e.returncode)
@@ -78,7 +79,7 @@ def run(
         dir_pre = f"{user}_pre"
         wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
         # remove the query parameter
-        _ = subprocess.run(["../remove_post.sh", dir_main], check=True, capture_output=True)
+        _ = subprocess.run(["../remove_post.sh", dir_pre], check=True, capture_output=True)
         # Extract JSON from GAllARY
         dir_json_gal = f"{user}_gal_json"
         JsonExtractor(reader=reader, writer=FileWriter(dir_json_gal)).extract(input_path=gal_pages)
@@ -152,6 +153,7 @@ def main():
 
     parser.add_argument("--wait-pages", type=float, default=6.0)
     parser.add_argument("--wait-images", type=float, default=3.0)
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {VERSION}")
 
     args = parser.parse_args()
 

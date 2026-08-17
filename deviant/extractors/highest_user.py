@@ -12,7 +12,6 @@ class HighestUserExtractor(UserPageExtractor):
         art_links = self.retrieve(input_path=input_path)
         art_link_paths = map(self.post_proces_function, art_links)
         art_link_paths = list(art_link_paths)
-        _logger.debug("total links in %s are %d", input_path, len(art_link_paths))
         regex = re.compile(r"page=(\d+)")
         regexes = map(regex.search, art_link_paths)
         # extract the numbers of the matches

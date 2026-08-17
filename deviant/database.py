@@ -140,7 +140,6 @@ def create_json_data(directory_path, max_depth):
     for a, b, c in os.walk(directory_path):
         for p in c:
             full_path = os.path.join(a, p)
-            _logger.info("Parsing %s", full_path)
             with open(full_path, "r") as fp:
                 try:
                     obj = json.load(fp)
@@ -159,7 +158,6 @@ def yield_json_from_directory(directory_path, max_depth):
     for a, b, c in os.walk(directory_path):
         for p in c:
             full_path = os.path.join(a, p)
-            _logger.info("Parsing %s", full_path)
             with open(full_path, "r") as fp:
                 try:
                     obj = json.load(fp)

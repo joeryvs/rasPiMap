@@ -39,7 +39,7 @@ def get_urls_from_json_files(file: str):
             data = json.load(fp=fp)
             for url in find_keys_rec(data, "url", False):
                 yield url
-        except json.json.JSONDecodeError:
+        except json.JSONDecodeError:
             _logger.warning("Not valid JSON %s", file)
 
 
@@ -59,6 +59,7 @@ def get_by_pattern(files: str, pattern: str):
 def post_modify_runction(url: str) -> str:
     # vim macro is 0nllc9e4000 + Esc + j0
     # now as a python function
+    # YOLO
     parts = url.split("=s")
     assert len(parts) == 2
     begin, end = parts
