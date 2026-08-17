@@ -3,14 +3,20 @@ import datetime
 import logging
 import os
 import pathlib
-import subprocess
-import sys
+import urllib.parse
 
 import extract
+import requests
 from main import YtPostScraper
 
 _logger = logging.getLogger(__name__)
 VERSION = "0.1"
+
+extensions = {
+    "text/html": ".html",
+    "application/json": ".json",
+    "image/webp": ".webp",
+}
 
 
 def full_scrape_user(user: str, wait_time: float):
@@ -34,23 +40,36 @@ def full_scrape_user(user: str, wait_time: float):
 
     # Use subprocess and wget to download the Images
     directory_prefix = f"{user}-full"
-    download_from_web(list(urls), target_directory=directory_prefix, input_file=input_file)
+    download_from_web(
+        list(urls),
+        target_directory=directory_prefix,
+        input_file=input_file,
+        overwrite=True,
+        update_extension=True,
+    )
 
-    rename_extensionless_files_in_directory(directory_prefix, target_extension=".webp")
 
-
-def download_from_web(urls: list[str], /, target_directory: str, input_file: str):
+def download_from_web(
+    urls: list[str], /, target_directory: str, input_file: str, overwrite=True, update_extension=False
+):
+    if target_directory:
+        os.makedirs(target_directory, exist_ok=True)
     # TODO replace with pure python
     with open(input_file, "w") as output:
         for url in urls:
             print(url, file=output)
-
-    subprocess.run(
-        ["wget", "--input-file", input_file, "--directory-prefix", target_directory, "--no-verbose"],
-        check=True,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    )
+    for i, url in enumerate(urls, start=1):
+        # From the url perform an urlsplit to remove the query parameters, and finally split at / and take the last element
+        p = urllib.parse.urlsplit(url=url).path.split("/")[-1]
+        with requests.get(url=url) as res:
+            new_file = pathlib.Path(os.path.join(target_directory, p))
+            if update_extension and (new_extension := extensions.get(res.headers["content-type"])):
+                new_file = new_file.with_suffix(new_extension)
+            if not overwrite and os.path.exists(new_file):
+                _logger.info("[%s] %s already exists skipping writing %s", i, new_file, url)
+            _logger.info("[%s] %s -> %s", i, url, new_file)
+            with open(new_file, "wb") as f:
+                f.write(res.content)
 
 
 def rename_extensionless_files_in_directory(dir: str, target_extension: str):
