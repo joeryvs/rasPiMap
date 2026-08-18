@@ -45,41 +45,45 @@ def run(
     skip_gallary_download: bool,
     skip_pages_download: bool,
     skip_image_download: bool,
-    download_from_gallary: bool,
+    pages_download_cutoff: int,
     post_process: bool,
 ):
     _logger.info("running process for %s", user)
     _logger.info(
-        "skip gallary : %s, skip pages : %s, download from gallary %s, skip image : %s, post process %s",
+        "skip gallary : %s, skip pages : %s, skip image : %s, post process %s",
         skip_gallary_download,
         skip_pages_download,
-        download_from_gallary,
         skip_image_download,
         post_process,
     )
-    _logger.info("Wait time page %s, Wait time image %s", wait_pages, wait_images)
+    _logger.info(
+        "Wait time page %s, Wait time image %s, pages download cutoff %s", wait_pages, wait_images, pages_download_cutoff
+    )
 
     reader = Reader()
     gal_page = f"{user}_gal_page_1.html"
+    gal_pages = f"gallary-pages/{user}/"
     if not skip_gallary_download:
         # Download gallary
         subprocess.run(["./user_page1_scrape.sh", user], check=True)
         writer = IOWriter()
         HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)  # pyright: ignore[reportUnknownMemberType]
         str_buffer = writer.get_buffer
-        AMOUNT = str(int(str_buffer.getvalue()))
+        AMOUNT = int(str_buffer.getvalue())
         _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
-        subprocess.run(["gallary-pages/scrape_user.sh", user, AMOUNT], check=True)
-    gal_pages = f"gallary-pages/{user}/"
-    if download_from_gallary:
+        subprocess.run(["gallary-pages/scrape_user.sh", user, str(AMOUNT)], check=True)
+    else:
+        AMOUNT = len(next(os.walk(gal_pages))[2])
+    if pages_download_cutoff < AMOUNT:
         json_pre_image = f"{user}_json_pre_image.txt"
         JsonImagePreUrlExtractor(reader=reader, writer=FileWriter(json_pre_image)).extract(
             gal_pages, sort=True, unique=True
         )
         dir_pre = f"{user}_pre"
-        wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
-        # remove the query parameter
-        _ = subprocess.run(["../remove_post.sh", dir_pre], check=True, capture_output=True)
+        if not skip_image_download:
+            wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
+            # remove the query parameter
+            _ = subprocess.run(["../remove_post.sh", dir_pre], check=True, capture_output=True)
         # Extract JSON from GAllARY
         dir_json_gal = f"{user}_gal_json"
         JsonExtractor(reader=reader, writer=FileWriter(dir_json_gal)).extract(input_path=gal_pages)
@@ -149,6 +153,12 @@ def main():
     parser.add_argument("--skip-pages-download", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--skip-image-download", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--download-from-gallary", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--pages-download-cutoff",
+        type=int,
+        default=20,
+        help="If there are more gallary pages that this number download directly from the gallary and skip the pages",
+    )
     parser.add_argument("--post-process", action=argparse.BooleanOptionalAction, default=False)
 
     parser.add_argument("--wait-pages", type=float, default=6.0)
@@ -164,7 +174,7 @@ def main():
         skip_gallary_download=args.skip_gallary_download,
         skip_pages_download=args.skip_pages_download,
         skip_image_download=args.skip_image_download,
-        download_from_gallary=args.download_from_gallary,
+        pages_download_cutoff=args.pages_download_cutoff,
         post_process=args.post_process,
     )
 
