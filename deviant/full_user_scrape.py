@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 
+import gal_scrape
 from database import create_db, fill_with_json_data, update_file_times
 from extractors import (
     ArtPageExtractor,
@@ -42,7 +43,7 @@ def run(
     /,
     wait_pages: float,
     wait_images: float,
-    skip_gallary_download: bool,
+    skip_gallery_download: bool,
     skip_pages_download: bool,
     skip_image_download: bool,
     pages_download_cutoff: int,
@@ -50,28 +51,33 @@ def run(
 ):
     _logger.info("running process for %s", user)
     _logger.info(
-        "skip gallary : %s, skip pages : %s, skip image : %s, post process %s",
-        skip_gallary_download,
+        "skip gallery : %s, skip pages : %s, skip image : %s, post process %s",
+        skip_gallery_download,
         skip_pages_download,
         skip_image_download,
         post_process,
     )
     _logger.info(
-        "Wait time page %s, Wait time image %s, pages download cutoff %s", wait_pages, wait_images, pages_download_cutoff
+        "Wait time page %s, Wait time image %s, pages download cutoff %s",
+        wait_pages,
+        wait_images,
+        pages_download_cutoff,
     )
 
     reader = Reader()
     gal_page = f"{user}_gal_page_1.html"
-    gal_pages = f"gallary-pages/{user}/"
-    if not skip_gallary_download:
+    gal_pages = f"gallery-pages/{user}/"
+    if not skip_gallery_download:
         # Download gallary
-        subprocess.run(["./user_page1_scrape.sh", user], check=True)
+        gal_scrape.run_single_page(users=user, wait_times=wait_pages)
+        # subprocess.run(["./user_page1_scrape.sh", user], check=True)
         writer = IOWriter()
         HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)  # pyright: ignore[reportUnknownMemberType]
         str_buffer = writer.get_buffer
         AMOUNT = int(str_buffer.getvalue())
         _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
-        subprocess.run(["gallary-pages/scrape_user.sh", user, str(AMOUNT)], check=True)
+        gal_scrape.run_multi_page(user=user, start_amount=1, end_amount=AMOUNT, wait_times=wait_pages)
+        # subprocess.run(["gallary-pages/scrape_user.sh", user, str(AMOUNT)], check=True)
     else:
         AMOUNT = len(next(os.walk(gal_pages))[2])
     if pages_download_cutoff < AMOUNT:
@@ -149,10 +155,9 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("user", type=str)
-    parser.add_argument("--skip-gallary-download", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--skip-gallery-download", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--skip-pages-download", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--skip-image-download", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--download-from-gallary", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument(
         "--pages-download-cutoff",
         type=int,
@@ -171,7 +176,7 @@ def main():
         args.user,
         wait_pages=args.wait_pages,
         wait_images=args.wait_images,
-        skip_gallary_download=args.skip_gallary_download,
+        skip_gallery_download=args.skip_gallery_download,
         skip_pages_download=args.skip_pages_download,
         skip_image_download=args.skip_image_download,
         pages_download_cutoff=args.pages_download_cutoff,
