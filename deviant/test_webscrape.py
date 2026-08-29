@@ -1,20 +1,26 @@
 import unittest
 
-import webscrape_extractors
+import utils
 from bs4 import BeautifulSoup
+from extractors import AvatarExtractor, ImageExtractor, MainImageExtractor
+from factory import ExtractorFactory
 from srcset_parsing import ImageType
 
 
 class TestBaseExtractor(unittest.TestCase):
     def test_error_when_constructing_raw_extractor(self):
 
-        self.assertRaises(TypeError, webscrape_extractors.Extractor)
+        self.assertRaises(TypeError, utils.Extractor)
 
 
 class TestImageExtractor(unittest.TestCase):
+    def setup(self):
+        self.reader = None
+        self.writer = None
+
     def test_regex_matches(self):
 
-        self.extractor = webscrape_extractors.ImageExtractor()
+        self.extractor = ImageExtractor(self.reader, self.writer)
         regex = self.extractor._regex()
         match_urls = [
             "https://www.example.com",
@@ -47,7 +53,7 @@ class TestImageExtractor(unittest.TestCase):
 
         html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3.png 4x'/>"""
         anchor = BeautifulSoup(html, "html.parser").find("img")
-        self.extractor = webscrape_extractors.ImageExtractor()
+        self.extractor = ImageExtractor(self.reader, self.writer)
 
         sources = list(self.extractor.retrieve_img_src(anchor))
 
@@ -63,7 +69,7 @@ class TestImageExtractor(unittest.TestCase):
     def test_retrieve_img_src_when_url_contains_comma(self):
         html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3,5.png 4x'/>"""
         anchor = BeautifulSoup(html, "html.parser").find("img")
-        self.extractor = webscrape_extractors.ImageExtractor()
+        self.extractor = ImageExtractor(self.reader, self.writer)
 
         sources = list(self.extractor.retrieve_img_src(anchor))
 
@@ -80,7 +86,7 @@ class TestImageExtractor(unittest.TestCase):
 class TestAvatarExtractor(unittest.TestCase):
     def test_regex_matches(self):
 
-        self.extractor = webscrape_extractors.AvatarExtractor()
+        self.extractor = AvatarExtractor(self.reader, self.writer)
         regex = self.extractor._regex()
         self.assertNotRegex("https://www.example.com/test1/level2/more", regex)
         self.assertRegex("https://a.deviantart.net/avatars-big/t/_/t-222.jpg?6", regex)
@@ -97,7 +103,7 @@ class TestMainImageExtractor(unittest.TestCase):
 
         html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3.png 4x'/>"""
         anchor = BeautifulSoup(html, "html.parser").find("img")
-        self.extractor = webscrape_extractors.MainImageExtractor()
+        self.extractor = MainImageExtractor(self.reader, self.writer)
 
         self.assertFalse(self.extractor._include_srcset)
 
@@ -111,7 +117,7 @@ class TestMainImageExtractor(unittest.TestCase):
 
 class TestExtractorFactory(unittest.TestCase):
     def setUp(self) -> None:
-        self.factory = webscrape_extractors.ExtractorFactory()
+        self.factory = ExtractorFactory()
         return super().setUp()
 
     def test_contains_keys(self):
@@ -128,7 +134,7 @@ class TestExtractorFactory(unittest.TestCase):
     def test_extractor_is_build(self):
 
         imageExt = self.factory.extractor("images")
-        self.assertIsInstance(imageExt, webscrape_extractors.Extractor)
+        self.assertIsInstance(imageExt, utils.Extractor)
 
     def test_invalid_key_gives_error(self):
 

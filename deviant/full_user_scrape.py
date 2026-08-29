@@ -1,10 +1,9 @@
 import argparse
 import logging
 import os
-import subprocess
-import sys
 
 import gal_scrape
+import wget_utils
 from database import create_db, fill_with_json_data, update_file_times
 from extractors import (
     ArtPageExtractor,
@@ -23,19 +22,8 @@ _logger = logging.getLogger(__name__)
 
 
 def wget_download(input_file: str, directory_prefix: str, wait_time: float, check: bool = True):
-    # Download the image with wget
-    rejected_log = "rejected_log.log"
-    open(rejected_log, "a").close()
-    cmd = ["wget", "--input-file", input_file, "--directory-prefix", directory_prefix]
-    if wait_time:
-        cmd.extend(["--wait", str(wait_time), "--random-wait"])
-
-    cmd.extend(["--no-verbose", "--rejected-log", rejected_log])
-    try:
-        p = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr, check=check)
-        _logger.info("Process %s, end with code %s", p.args, p.returncode)
-    except subprocess.CalledProcessError as e:
-        _logger.error("Process %s Error with code %s", e.args, e.returncode)
+    # Download the image with wget_utils function
+    wget_utils.download_from_file(input_file, directory_prefix, wait_time=wait_time, random_wait=True)
 
 
 def run(
@@ -88,8 +76,6 @@ def run(
         dir_pre = f"{user}_pre"
         if not skip_image_download:
             wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
-            # remove the query parameter
-            _ = subprocess.run(["../remove_post.sh", dir_pre], check=True, capture_output=True)
         # Extract JSON from GAllARY
         dir_json_gal = f"{user}_gal_json"
         JsonExtractor(reader=reader, writer=FileWriter(dir_json_gal)).extract(input_path=gal_pages)
@@ -134,9 +120,6 @@ def run(
         # Download the image with wget
 
         wget_download(input_file=main_image, directory_prefix=dir_main, wait_time=wait_images)
-
-        # remove the query parameter
-        _ = subprocess.run(["../remove_post.sh", dir_main], check=True, capture_output=True)
 
     user_db = f"{user}.sqlite"
     if post_process:

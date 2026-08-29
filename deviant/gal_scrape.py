@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import random
 import re
 import time
 
@@ -10,7 +11,9 @@ DEFAULT_TIMEOUT = 3000
 _logger = logging.getLogger(__name__)
 
 
-def pause_execution(seconds):
+def pause_execution(seconds, random_wait: bool = False):
+    if random_wait:
+        seconds = max(0, seconds + random.uniform(-0.5, 0.5))
     return time.sleep(seconds)
 
 
