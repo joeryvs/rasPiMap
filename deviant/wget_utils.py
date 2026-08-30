@@ -37,6 +37,12 @@ _logger = logging.getLogger(__name__)
 # --- helpers ---
 
 
+def pause_execution(seconds, random_wait: bool = False):
+    if random_wait:
+        seconds = max(0, seconds + random.uniform(-0.5, 0.5))
+    return time.sleep(seconds)
+
+
 def _to_unicode(filename: str) -> str:
     """:return: filename decoded from utf-8 to unicode"""
     return filename
@@ -234,6 +240,13 @@ def _detect_filename(url=None, out=None, headers=None, default="download.wget"):
     return names["out"] or names["headers"] or names["url"] or default
 
 
+def curl_download(url: str, output_file: str):
+    # download 1 file, and output it, simulating a single curl call
+    _logger.debug("Download %s, saving to %s", url, output_file)
+    with requests.get(url=url, timeout=DEFAULT_TIMEOUT) as res, open(output_file, "wb") as f:
+        f.write(res.content)
+
+
 def download_file(url, out=None):
     """High level function, which downloads URL into tmp file in current
     directory and then renames it to filename autodetected from either URL
@@ -277,9 +290,7 @@ def download_from_stream(urls, directory_prefix: str, *, wait_time: float = 0, r
     with requests.Session() as session:
         for i, url in enumerate(urls):
             if i and wait_time >= 0:
-                seconds = max(0, wait_time + random.uniform(-0.5, 0.5)) if random_wait else wait_time
-                if seconds:
-                    time.sleep(seconds)
+                pause_execution(wait_time,random_wait)
             try:
                 with session.get(url=url, timeout=DEFAULT_TIMEOUT) as res:
                     headers = res.headers

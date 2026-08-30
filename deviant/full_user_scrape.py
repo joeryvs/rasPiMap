@@ -58,14 +58,12 @@ def run(
     if not skip_gallery_download:
         # Download gallary
         gal_scrape.run_single_page(users=user, wait_times=wait_pages)
-        # subprocess.run(["./user_page1_scrape.sh", user], check=True)
         writer = IOWriter()
         HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)  # pyright: ignore[reportUnknownMemberType]
         str_buffer = writer.get_buffer
         AMOUNT = int(str_buffer.getvalue())
         _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
         gal_scrape.run_multi_page(user=user, start_amount=1, end_amount=AMOUNT, wait_times=wait_pages)
-        # subprocess.run(["gallary-pages/scrape_user.sh", user, str(AMOUNT)], check=True)
     else:
         AMOUNT = len(next(os.walk(gal_pages))[2])
     if pages_download_cutoff < AMOUNT:
@@ -94,7 +92,6 @@ def run(
     art_pages_link_file = f"{user}_art.txt"
     art_pages = f"Art-Pages/{user}_art/"
     if not skip_pages_download:
-        # subprocess.run(["python", "main.py", "art", "-i", gal_pages, "-o", art_pages_link_file, "--quiet"], check=True)
         ArtPageExtractor(reader=reader, writer=FileWriter(art_pages_link_file)).extract(
             gal_pages, sort=True, unique=True
         )
