@@ -57,9 +57,9 @@ def run(
     gal_pages = f"gallery-pages/{user}/"
     if not skip_gallery_download:
         # Download gallary
-        gal_scrape.run_single_page(users=user, wait_times=wait_pages)
+        gal_scrape.run_single_page(users=user, wait=wait_pages)
         writer = IOWriter()
-        HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)  # pyright: ignore[reportUnknownMemberType]
+        HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)
         str_buffer = writer.get_buffer
         AMOUNT = int(str_buffer.getvalue())
         _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)

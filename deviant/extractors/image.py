@@ -54,3 +54,19 @@ class ImageExtractor(Extractor):
 
     def _regex(self):
         return re.compile(r"^https://.*$")
+
+
+class DefaultImageExtractor(ImageExtractor):
+    _include_srcset = False
+
+
+class LargestImageExtractor(ImageExtractor):
+    _include_srcset = True
+
+    def retrieve_img_src(self, anchor):
+        result = super().retrieve_img_src(anchor)
+
+        maximum = max(result, default=None)
+        if maximum:
+            _logger.debug("maximum is %s", maximum)
+            yield maximum

@@ -13,12 +13,12 @@ class DeviantArtImage2XExtractor(DeviantArtImageExtractor):
         return (x for x in super().retrieve_img_src(anchor) if x.density == 2)
 
 
-class AllImagesExtractor(DeviantArtImageExtractor):
+class DeviantArtAllImagesExtractor(DeviantArtImageExtractor):
     def _keep_string(self, regex, string):
         return True
 
 
-class LargeImageExtractor(DeviantArtImageExtractor):
+class DeviantArtLargeImageExtractor(DeviantArtImageExtractor):
     def _regex(self):
         return re.compile(
             r"^.*/images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/\w/(\d|\w|\-)+/(\d|\w|\-|\.)+\?token=(.*)$"
