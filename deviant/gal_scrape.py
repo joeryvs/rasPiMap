@@ -1,12 +1,9 @@
 import argparse
 import logging
 import os
-import random
 import re
-import time
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timezone
 
-import requests
 import wget_utils
 
 DEFAULT_TIMEOUT = 3000
@@ -22,12 +19,12 @@ def _validate_user_name(user_name):
     return user_name
 
 
-def run_multi_page(user: str, start_amount: int, end_amount: int | None, wait_times: float):
+def run_multi_page(user: str, start_amount: int, end_amount: int | None, wait: float):
     # Validation
     if end_amount is None:
         start_amount, end_amount = 1, start_amount
 
-    if wait_times < 0.0:
+    if wait < 0.0:
         raise ValueError("Wait time should be positive")
 
     user_dir = os.path.join(os.path.dirname(__file__), "gallery-pages", user)
@@ -37,23 +34,23 @@ def run_multi_page(user: str, start_amount: int, end_amount: int | None, wait_ti
         target = os.path.join(user_dir, f"gallery_page_{i}.html")
         wget_utils.curl_download(url, target)
         if i != start_amount:
-            wget_utils.pause_execution(wait_times)
+            wget_utils.pause_execution(wait)
 
 
-def run_single_page(users: list[str] | str, wait_times: float):
+def run_single_page(users: list[str] | str, wait: float):
     if isinstance(users, str):
         users = [users]
     for i, user in enumerate(users):
         # on iterations after the first, run a delay
         if i:
-            wget_utils.pause_execution(wait_times)
+            wget_utils.pause_execution(wait)
         print(user)
         user_url = "https://www.deviantart.com/{}/gallery?page=1".format(user)
         user_output = "{}_gal_page_1.html".format(user)
         wget_utils.curl_download(url=user_url, output_file=user_output)
 
 
-def run_daily(wait_times: float = 0.2):
+def run_daily(wait: float = 0.2):
 
     today = datetime.now(tz=timezone.utc)
     today_map = format(today, "art-%Y-%j")
@@ -76,11 +73,14 @@ def run_daily(wait_times: float = 0.2):
     extractor = JsonImagePreUrlExtractor(reader=utils.Reader(), writer=utils.FileWriter(today_art_links))
 
     extractor.extract(today_index, sort=True, unique=True)
-    wget_utils.download_from_file(today_art_links, today_map, wait_time=wait_times)
+    wget_utils.download_from_file(today_art_links, today_map, wait_time=wait)
     return 0
 
 
-def run_tag(tags, wait_times):
+def run_tag(tags, wait: float):
+
+    from extractors import JsonImagePreUrlExtractor
+    from utils import FileWriter, Reader
 
     today = format(datetime.now(tz=timezone.utc), "%Y-%j")
     for tag in tags:
@@ -94,21 +94,18 @@ def run_tag(tags, wait_times):
 
         print(url, today_tag_map, today_tag_index, today_tag_art_links)
 
-        if os.path.exists(today_tag_index):
-            _logger.warning("Tag $(tag)s is already downloaded", tag=tag)
+        if os.path.isfile(today_tag_index):
+            _logger.warning("Tag %s is already downloaded", tag)
             continue
 
         os.makedirs(today_tag_map)
         wget_utils.curl_download(url=url, output_file=today_tag_index)
 
-        from extractors import MainImageExtractor
-        from utils import FileWriter, Reader
-
-        extractor = MainImageExtractor(reader=Reader(), writer=FileWriter(today_tag_art_links))
+        extractor = JsonImagePreUrlExtractor(reader=Reader(), writer=FileWriter(today_tag_art_links))
         extractor.extract(today_tag_index, sort=True, unique=True)
-        wget_utils.download_from_file(today_tag_art_links, today_tag_map, wait_time=wait_times)
+        wget_utils.download_from_file(today_tag_art_links, today_tag_map, wait_time=wait)
 
-        time.sleep(3)
+        wget_utils.pause_execution(3)
 
     return 0
 
@@ -118,7 +115,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     time_parser = argparse.ArgumentParser(add_help=False)
-    time_parser.add_argument("--wait-times", type=float, default=11)
+    time_parser.add_argument("--wait", type=float, default=11, dest="wait")
 
     subparsers = parser.add_subparsers()
     single_page_parser = subparsers.add_parser("single", parents=[time_parser])
@@ -133,11 +130,11 @@ def main():
     multi_page_parser.set_defaults(func=run_multi_page)
 
     daily_parser = subparsers.add_parser("daily", parents=[time_parser])
-    daily_parser.set_defaults(func=run_daily, wait_time=0.4)
+    daily_parser.set_defaults(func=run_daily, wait=0.4)
 
     tag_parser = subparsers.add_parser("tag", parents=[time_parser])
     tag_parser.add_argument("tags", type=str, nargs="+")
-    tag_parser.set_defaults(func=run_tag, wait_time=0.5)
+    tag_parser.set_defaults(func=run_tag, wait=0.5)
 
     args = parser.parse_args()
     args = vars(args)

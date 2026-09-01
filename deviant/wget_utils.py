@@ -290,7 +290,7 @@ def download_from_stream(urls, directory_prefix: str, *, wait_time: float = 0, r
     with requests.Session() as session:
         for i, url in enumerate(urls):
             if i and wait_time >= 0:
-                pause_execution(wait_time,random_wait)
+                pause_execution(wait_time, random_wait)
             try:
                 with session.get(url=url, timeout=DEFAULT_TIMEOUT) as res:
                     headers = res.headers
@@ -337,14 +337,142 @@ def main():
 
     parser = ArgumentParser(add_help=True)
 
-    parser.add_argument("-v", "--version", action="version", version=__version__)
+    parser.add_argument("-V", "--version", action="version", version=__version__)
 
     parser.add_argument("url")
-    parser.add_argument("-o", "--output", dest="output")
-    parser.add_argument("-P", "--directory-prefix", dest="directory_prefix")
-    parser.add_argument("--wait-times", type=float, dest="wait_times")
-    parser.add_argument("--random-wait", action=BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "-b",
+        "--background",
+        help="Go  to  background immediately after startup.  If no output file is specified via the -o, output is redirected to wget-log.",
+    )
+    parser.add_argument(
+        "-e",
+        "--execute",
+        help="Execute command as if it were a part of .wgetrc.   A  command  thus invoked will be executed after the commands in .wgetrc, thus taking precedence  over them.  If you need to specify more than one wgetrc               command, use multiple instances of -e.",
+    )
+    # logging
+    parser.add_argument(
+        "-o",
+        "--output-file",
+        help="""Log all messages to logfile.  The messages are normally reported to
+               standard error.""",
+    )
+    parser.add_argument(
+        "-a",
+        "--append-output",
+        help="""Append to logfile.  This is the same as  -o,  only  it  appends  to
+               logfile  instead  of overwriting the old log file.  If logfile does
+               not exist, a new file is created.
+""",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="""           Turn on debug output, meaning various information important to  the
+    developers  of  Wget  if  it  does  not work properly.  Your system
+    administrator  may  have  chosen  to  compile  Wget  without  debug
+    support,  in  which  case  -d  will  not  work.   Please  note that
+    compiling with debug support is always  safe---Wget  compiled  with
+    the  debug  support  will not print any debug info unless requested
+    with -d.
+""",
+    )
+    parser.add_argument(
+        "-q",
+        "--queit",
+        help="""Turn off Wget's output.
+""",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="""           Turn on verbose output, with all the available data.   The  default
+    output is verbose.
+""",
+        dest="verbose",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-nv",
+        "--no-verbose",
+        dest="verbose",
+        action="store_false",
+        help="""         Turn  off verbose without being completely quiet (use -q for that),
+      which means that error messages and  basic  information  still  get
+      printed.
+""",
+    )
+
+    parser.add_argument(
+        "--report-speed", choices=["bits"], help="Output bandwidth as type.  The only accepted value is bits."
+    )
     parser.add_argument("-i", "--input-file", dest="input_file")
+    parser.add_argument("--input-metalink")
+    parser.add_argument("--keep-badhash")
+    parser.add_argument("--metalink-over-http")
+    parser.add_argument("--preferred-location")
+    parser.add_argument("--xattr")
+    parser.add_argument("-F", "--forece-html")
+    parser.add_argument("-B", "-base")
+    parser.add_argument("--config")
+    parser.add_argument("--rejected-log")
+
+    # Download Options
+    parser.add_argument("--bind-address")
+    parser.add_argument("--bind-dns-address")
+    parser.add_argument("--dns-servers")
+    parser.add_argument("-t", "--tries")
+    parser.add_argument("-O", "--output-document")
+
+    parser.add_argument("-nc", "--no-clobber")
+    parser.add_argument("--backups", type=int)
+    parser.add_argument("--no-netrc")
+    parser.add_argument("-c", "--continue")
+    parser.add_argument("--start-pos")
+    parser.add_argument("--progress", choices=["dot", "bar"], default="bar")
+    parser.add_argument("--show-progess")
+    parser.add_argument("-N", "--timestamping")
+    parser.add_argument("--no-if-modified-since")
+    parser.add_argument("--no-use-server-timestamps")
+    parser.add_argument("-S", "--server-response")
+    parser.add_argument("--spider")
+    parser.add_argument("-T", "--timeout")
+    parser.add_argument("--dns-timeout")
+    parser.add_argument("--connect-timeout")
+    parser.add_argument("--read-timeout")
+    parser.add_argument("--limit-rate")
+    parser.add_argument("--spider")
+    parser.add_argument("-w", "--wait", type=float, dest="wait_times")
+    parser.add_argument("--waitretry")
+    parser.add_argument("--random-wait", action=BooleanOptionalAction, default=False)
+    parser.add_argument("--no-proxy")
+    parser.add_argument("-Q", "--quota")
+    parser.add_argument("--no-dns-cache")
+    parser.add_argument(
+        "--restrict-file-names", choices=["unix", "windows", "nocontrol", "ascii", "lowercase", "uppercase"]
+    )
+    parser.add_argument("-6","--init6-only")
+    parser.add_argument("-4","--init4-only")
+    parser.add_argument("--prefer-family")
+    parser.add_argument("--retry-connrefused")
+
+    parser.add_argument("--user")
+    parser.add_argument("--password")
+    parser.add_argument("--ask-password")
+    parser.add_argument("--no-iri")
+    parser.add_argument("--local-encoding")
+    parser.add_argument("--remote-encoding")
+    parser.add_argument("--unlink")
+
+    # Directory Options
+    parser.add_argument("-nd","--no-directories")
+    parser.add_argument("--ask-password")
+    parser.add_argument("--ask-password")
+
+
+    parser.add_argument("-P", "--directory-prefix", dest="directory_prefix")
     args = parser.parse_args()
 
     # print(options)

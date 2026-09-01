@@ -63,14 +63,15 @@ def run(
         str_buffer = writer.get_buffer
         AMOUNT = int(str_buffer.getvalue())
         _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
-        gal_scrape.run_multi_page(user=user, start_amount=1, end_amount=AMOUNT, wait_times=wait_pages)
+        gal_scrape.run_multi_page(user=user, start_amount=1, end_amount=AMOUNT, wait=wait_pages)
     else:
         AMOUNT = len(next(os.walk(gal_pages))[2])
     if pages_download_cutoff < AMOUNT:
         json_pre_image = f"{user}_json_pre_image.txt"
-        JsonImagePreUrlExtractor(reader=reader, writer=FileWriter(json_pre_image)).extract(
-            gal_pages, sort=True, unique=True
-        )
+        if not os.path.isfile(json_pre_image):
+            JsonImagePreUrlExtractor(reader=reader, writer=FileWriter(json_pre_image)).extract(
+                gal_pages, sort=True, unique=True
+            )
         dir_pre = f"{user}_pre"
         if not skip_image_download:
             wget_download(input_file=json_pre_image, directory_prefix=dir_pre, wait_time=wait_images)
@@ -104,9 +105,10 @@ def run(
     main_image = f"{user}_main_image.txt"
     if not skip_image_download:
         # find image links
-        MainImageExtractor(reader=reader, writer=FileWriter(main_image)).extract(
-            input_path=art_pages, sort=True, unique=True
-        )
+        if not os.path.isfile(main_image):
+            MainImageExtractor(reader=reader, writer=FileWriter(main_image)).extract(
+                input_path=art_pages, sort=True, unique=True
+            )
 
         # output description/story/json description
         DescriptionExtractor(reader=reader, writer=FileWriter(dir_desc)).extract(input_path=art_pages)
