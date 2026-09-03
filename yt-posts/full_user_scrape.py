@@ -5,6 +5,7 @@ import datetime
 import logging
 import os
 import pathlib
+import time
 import urllib.parse
 from uuid import uuid4
 
@@ -22,7 +23,9 @@ extensions = {
 }
 
 
-def full_scrape_user(user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_temp_urls: bool):
+def full_scrape_user(
+    user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_temp_urls: bool, eager: bool
+):
 
     _logger.debug("Scraping user %s", user)
     input_file = f"{user}-full-urls.txt"
@@ -36,8 +39,9 @@ def full_scrape_user(user: str, wait_time: float, *, save_json: bool, save_urls:
     else:
         json_directory = None
 
-    all_urls = full_scrape_user_urls(user=user, wait_time=wait_time, json_directory=json_directory)
-
+    all_urls = full_scrape_user_urls(user=user, wait_time=wait_time, json_directory=json_directory, eager=eager)
+    if eager:
+        all_urls = list(all_urls)
     if save_temp_urls:
         all_urls = print_iter_item(f"{user}-full-temp-urls.txt", all_urls)
 
@@ -47,17 +51,21 @@ def full_scrape_user(user: str, wait_time: float, *, save_json: bool, save_urls:
     urls = unique(map(extract.post_modify_runction, urls))
     if save_urls:
         urls = print_iter_item(input_file, urls)
+    if eager:
+        urls = list(urls)
     directory_prefix = f"{user}-full"
     download_from_web(urls, target_directory=directory_prefix, overwrite=True, update_extension=True)
 
 
-def full_scrape_user_urls(user: str, wait_time: float, *, json_directory: str | None) -> collections.abc.Iterable[str]:
+def full_scrape_user_urls(
+    user: str, wait_time: float, *, json_directory: str | None, eager: bool = False
+) -> collections.abc.Iterable[str]:
 
     graft_url = f"https://www.youtube.com/@{user.strip().removeprefix('@')}/posts"
 
     # use the functionality in main.py to downlaod the JSON
     scraper = YtPostScraper(json_directory, graft_url, wait_time=wait_time)
-    _html_data, jsons = scraper.run()
+    _html_data, jsons = scraper.run(eager=eager)
     # Use the extract.py to retrieve and modify the urls
     for j in jsons:
         yield from extract.find_keys_rec(j, "url", False)
@@ -72,6 +80,7 @@ def download_from_web(
     for i, url in enumerate(urls, start=1):
         # From the url perform an urlsplit to remove the query parameters, and finally split at / and take the last element
         p = urllib.parse.urlsplit(url=url).path.split("/")[-1]
+        time.sleep(0.1)
         with requests.get(url=url) as res:
             new_file = pathlib.Path(os.path.join(target_directory, p))
             if update_extension and (new_extension := extensions.get(res.headers["content-type"])):
@@ -110,7 +119,7 @@ def unique(items: collections.abc.Iterable[str]) -> collections.abc.Iterable[str
     seen = dict()
     for item in items:
         if item not in seen:
-            yield seen
+            yield item
             seen.setdefault(item)
 
 
@@ -142,6 +151,12 @@ def main():
     parser.add_argument("--save-json", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--save-urls", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--save-temp-urls", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--eager",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="if set, download all json before downloading images",
+    )
 
     args = parser.parse_args()
     users = args.users
@@ -149,9 +164,15 @@ def main():
     save_json = args.save_json
     save_urls = args.save_urls
     save_temp_urls = args.save_temp_urls
+    eager = args.eager
     for user in users:
         full_scrape_user(
-            user, wait_time=wait_time, save_json=save_json, save_urls=save_urls, save_temp_urls=save_temp_urls
+            user,
+            wait_time=wait_time,
+            save_json=save_json,
+            save_urls=save_urls,
+            save_temp_urls=save_temp_urls,
+            eager=eager,
         )
 
 

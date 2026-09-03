@@ -152,11 +152,10 @@ class YtPostScraper(AbstractScraper):
 
         state = YtState(continuation, tracking_params, self.graft_url)
         index = 1
-        jsons = []
         while 1:
             _logger.info("Iteration: %s, currentState: %s", index, state)
             json_obj = self.download_continuation_json(state)
-            jsons.append(json_obj)
+            yield json_obj
             # save the JSON for later
             if self.base_dir is not None:
                 out_path = os.path.join(self.base_dir, f"out_{index}.json")
@@ -177,7 +176,6 @@ class YtPostScraper(AbstractScraper):
             index += 1
             state = YtState(c, t, self.graft_url)
             time.sleep(self.wait_time)
-        return jsons
 
     def download_page(self):
 
@@ -214,7 +212,7 @@ class YtPostScraper(AbstractScraper):
         assert isinstance(trackingParams, str)
         return command, trackingParams
 
-    def run(self):
+    def run(self, eager: bool):
         """Download page and start an iterative loop"""
         html_data = self.download_page()
         soup = BeautifulSoup(html_data, features="html.parser")
@@ -224,53 +222,16 @@ class YtPostScraper(AbstractScraper):
             return "", []
         c, t = ans1
         jsons = self.runloop(c, t)
+        if eager:
+            # if not lazy, listify the JSON element
+            jsons = list(jsons)
         return html_data, jsons
-
-    def run_stack(self):
-        raise Exception("STupid method")
-        html_data = self.download_page()
-        soup = BeautifulSoup(html_data, features="html.parser")
-        ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
-        if not ans1:
-            _logger.error("No tokens found")
-            return
-        c, t = ans1
-        begin_state = YtState(continuationToken=c, trackingParams=t, graft_url=self.graft_url)
-
-        seen = set()
-        todos = [begin_state]
-
-        index = 0
-        while todos:
-            state = todos.pop()
-            if state in seen:
-                continue
-            seen.add(state)
-            index += 1
-            c = state.continuationToken
-            t = state.trackingParams
-            print(index, c, t, len(todos))
-            out_path = self.download_continuation_json(c, t, index)
-            with open(out_path, "r") as fp:
-                data = json.load(fp=fp)
-
-            # print(data)
-            # Get new token and trackingParams
-            t = data.get("trackingParams")
-            ans = find_keys_rec(data, "continuationCommand", with_path=True)
-            for p, c2 in ans:
-                print(c2)
-                if isinstance(c2, dict):
-                    new_state = YtState(continuationToken=c2.get("token"), trackingParams=t, graft_url=self.graft_url)
-                    todos.append(new_state)
-            time.sleep(self.wait_time)
 
 
 def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-P", "--directory-prefix", type=str)
-    parser.add_argument("--stack", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--wait-times", type=float, default=5)
 
     parser.add_argument("user")
@@ -284,10 +245,7 @@ def main():
 
     os.makedirs(directory_prefix, exist_ok=True)
     scraper = YtPostScraper(directory_prefix, graft_url, wait_time=args.wait_times)
-    if args.stack:
-        scraper.run_stack()
-    else:
-        scraper.run()
+    scraper.run(eager=True)
 
 
 if __name__ == "__main__":
