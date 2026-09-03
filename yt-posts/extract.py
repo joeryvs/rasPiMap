@@ -61,19 +61,6 @@ def get_by_pattern(files: str, pattern: str):
                 yield url
 
 
-def post_modify_runction(url: str) -> str:
-    # vim macro is 0nllc9e4000 + Esc + j0
-    # now as a python function
-    # YOLO
-    parts = url.split("=s")
-    assert len(parts) == 2
-    begin, end = parts
-    x = end.split("-")
-    x[0] = "4000"
-    x[1:3] = []
-    return f"{begin}=s{'-'.join(x)}"
-
-
 def main():
     parser = argparse.ArgumentParser()
 
@@ -84,7 +71,7 @@ def main():
 
     args = parser.parse_args()
 
-    func = post_modify_runction if args.post_process else None
+    func = None
     with sys.stdout if args.output == "-" else open(args.output, "a") as output:
         run(args.input_file, func=func, output=output)
 
