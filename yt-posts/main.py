@@ -8,7 +8,7 @@ from urllib.request import urlopen
 
 import requests
 from base import Scraper, State
-from utils import find_key_rec, find_keys_rec, find_keys_rec_without_path
+from utils import find_key_rec, find_keys_rec_without_path
 
 _logger = logging.getLogger(__name__)
 
@@ -137,16 +137,16 @@ class YtPostScraper(Scraper):
         json_obj = json.loads(value)
         # Step 3 find and return the continuationCommand
         # command = json_obj
-        command = find_key_rec(json_obj, "continuationCommand")[1]["token"]
-        # for index in keys_to_continuation_token:
-        # command = command[index]
-
-        assert isinstance(command, str)
+        command = find_key_rec(json_obj, "continuationCommand")
+        if not isinstance(command, dict):
+            return None
+        continationToken = command["token"]
+        assert isinstance(continationToken, str)
 
         trackingParams: str = json_obj["trackingParams"]
         assert isinstance(trackingParams, str)
 
-        state = YtState(continuationToken=command, trackingParams=trackingParams, graft_url=self.graft_url)
+        state = YtState(continuationToken=continationToken, trackingParams=trackingParams, graft_url=self.graft_url)
         return state
 
     def download_continuation(self, state):
@@ -159,11 +159,10 @@ class YtPostScraper(Scraper):
     def find_next_state(self, json_obj, prev_state) -> State | None:
 
         ans = find_key_rec(json_obj, "continuationCommand")
-        if ans is None:
-            return None
-        p, c2 = ans
-        _logger.debug("Path to continuation command: %s", p)
+        c2 = ans
         _logger.debug("continuationCommand: %s", c2)
+        if not isinstance(c2, dict):
+            return None
         # Get new token and trackingParams and build a new State
         c = c2.get("token")
         t = json_obj.get("trackingParams")

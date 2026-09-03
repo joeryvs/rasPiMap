@@ -1,23 +1,17 @@
-import argparse
-import dataclasses
-import datetime
 import json
 import logging
 import os
 import time
 from abc import ABC, abstractmethod
-from urllib.request import Request, urlopen
 
-import requests
 from bs4 import BeautifulSoup
-from utils import find_key_rec, find_keys_rec
 
 _logger = logging.getLogger(__name__)
 
 
 class State(ABC):
     @abstractmethod
-    def get_data_raw(self):
+    def get_data_raw(self) -> str | dict:
         pass
 
 

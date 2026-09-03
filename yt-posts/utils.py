@@ -1,4 +1,5 @@
 import collections.abc
+import copy
 
 
 def find_key_rec(obj, key):
@@ -9,6 +10,7 @@ def find_key_rec(obj, key):
 
 
 def find_key_rec_with_path(obj, key: str):
+    assert isinstance(key, str)
     SENTINAL = object()
 
     def find_key_rec2(obj):
@@ -39,7 +41,7 @@ def find_keys_rec_without_path(obj, key: str):
         if isinstance(obj, dict):
             if key in obj:
                 # Create a new list
-                result.append(obj[key].copy())
+                result.append(copy.deepcopy(obj[key]))
             for v in obj.values():
                 foo(v)
         elif isinstance(obj, list):
