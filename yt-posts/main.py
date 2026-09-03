@@ -118,14 +118,15 @@ class AbstractScraper(ABC):
 
 
 class YtPostScraper(AbstractScraper):
-    def __init__(self, base_dir: str, graft_url: str, /, wait_time: float = 5.0) -> None:
-        self._base_dir: str = base_dir
+    def __init__(self, base_dir: str | None, graft_url: str, /, wait_time: float = 5.0) -> None:
+        self._base_dir: str | None = base_dir
         self.graft_url: str = graft_url
         self.wait_time: float = wait_time
 
-        assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
-            "Scraping store directory does not exist"
-        )
+        if self._base_dir is not None:
+            assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
+                "Scraping store directory does not exist"
+            )
 
     # OVERRIDES
     @property
@@ -151,13 +152,16 @@ class YtPostScraper(AbstractScraper):
 
         state = YtState(continuation, tracking_params, self.graft_url)
         index = 1
+        jsons = []
         while 1:
             _logger.info("Iteration: %s, currentState: %s", index, state)
             json_obj = self.download_continuation_json(state)
+            jsons.append(json_obj)
             # save the JSON for later
-            out_path = os.path.join(self.base_dir, f"out_{index}.json")
-            with open(out_path, "w") as f_out:
-                json.dump(fp=f_out, obj=json_obj, indent=2)
+            if self.base_dir is not None:
+                out_path = os.path.join(self.base_dir, f"out_{index}.json")
+                with open(out_path, "w") as f_out:
+                    json.dump(fp=f_out, obj=json_obj, indent=2)
 
             ans = find_key_rec(json_obj, "continuationCommand")
             if ans is None:
@@ -173,6 +177,7 @@ class YtPostScraper(AbstractScraper):
             index += 1
             state = YtState(c, t, self.graft_url)
             time.sleep(self.wait_time)
+        return jsons
 
     def download_page(self):
 
@@ -216,9 +221,10 @@ class YtPostScraper(AbstractScraper):
         ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
         if not ans1:
             _logger.error("No tokens found")
-            return
+            return "", []
         c, t = ans1
-        self.runloop(c, t)
+        jsons = self.runloop(c, t)
+        return html_data, jsons
 
     def run_stack(self):
         raise Exception("STupid method")

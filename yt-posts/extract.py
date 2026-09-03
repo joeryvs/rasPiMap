@@ -43,6 +43,11 @@ def get_urls_from_json_files(file: str):
             _logger.warning("Not valid JSON %s", file)
 
 
+def get_urls_from_json(obj):
+    for url in find_keys_rec(obj, "url", False):
+        yield url
+
+
 def run(files: str, output, func=None):
     for url in get_by_pattern(files, "https://yt3.ggpht.com"):
         url = url if func is None else func(url)
