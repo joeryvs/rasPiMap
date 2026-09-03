@@ -220,44 +220,6 @@ class YtPostScraper(AbstractScraper):
         c, t = ans1
         self.runloop(c, t)
 
-    def run_stack(self):
-        raise Exception("STupid method")
-        html_data = self.download_page()
-        soup = BeautifulSoup(html_data, features="html.parser")
-        ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
-        if not ans1:
-            _logger.error("No tokens found")
-            return
-        c, t = ans1
-        begin_state = YtState(continuationToken=c, trackingParams=t, graft_url=self.graft_url)
-
-        seen = set()
-        todos = [begin_state]
-
-        index = 0
-        while todos:
-            state = todos.pop()
-            if state in seen:
-                continue
-            seen.add(state)
-            index += 1
-            c = state.continuationToken
-            t = state.trackingParams
-            print(index, c, t, len(todos))
-            out_path = self.download_continuation_json(c, t, index)
-            with open(out_path, "r") as fp:
-                data = json.load(fp=fp)
-
-            # print(data)
-            # Get new token and trackingParams
-            t = data.get("trackingParams")
-            ans = find_keys_rec(data, "continuationCommand", with_path=True)
-            for p, c2 in ans:
-                print(c2)
-                if isinstance(c2, dict):
-                    new_state = YtState(continuationToken=c2.get("token"), trackingParams=t, graft_url=self.graft_url)
-                    todos.append(new_state)
-            time.sleep(self.wait_time)
 
 
 def main():
