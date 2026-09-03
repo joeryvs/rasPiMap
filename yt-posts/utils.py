@@ -1,6 +1,14 @@
+import collections.abc
 
 
 def find_key_rec(obj, key):
+    ans = find_key_rec_with_path(obj=obj, key=key)
+    if ans is not None:
+        return ans[1]
+    return None
+
+
+def find_key_rec_with_path(obj, key: str):
     SENTINAL = object()
 
     def find_key_rec2(obj):
@@ -21,6 +29,28 @@ def find_key_rec(obj, key):
         return None
 
     return find_key_rec2(obj=obj)
+
+
+def find_keys_rec_without_path(obj, key: str):
+    assert isinstance(key, str)
+    result = []
+
+    def foo(obj):
+        if isinstance(obj, dict):
+            if key in obj:
+                # Create a new list
+                result.append(obj[key].copy())
+            for v in obj.values():
+                foo(v)
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                foo(v)
+        elif obj == key:
+            result.append(key)
+
+    foo(obj)
+    return result
+
 
 def find_keys_rec(obj, key, with_path=False):
     assert isinstance(key, str)
@@ -46,3 +76,19 @@ def find_keys_rec(obj, key, with_path=False):
 
     foo(obj)
     return result
+
+
+def print_iter_item(file_name: str, /, items: collections.abc.Iterable[str]) -> collections.abc.Iterable[str]:
+
+    with open(file_name, "a") as file:
+        for item in items:
+            print(item, file=file)
+            yield item
+
+
+def unique(items: collections.abc.Iterable[str]) -> collections.abc.Iterable[str]:
+    seen = dict()
+    for item in items:
+        if item not in seen:
+            yield item
+            seen.setdefault(item)

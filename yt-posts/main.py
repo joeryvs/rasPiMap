@@ -4,21 +4,13 @@ import datetime
 import json
 import logging
 import os
-import time
-from abc import ABC, abstractmethod
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 import requests
-from bs4 import BeautifulSoup
-from utils import find_key_rec, find_keys_rec
+from base import Scraper, State
+from utils import find_key_rec, find_keys_rec, find_keys_rec_without_path
 
 _logger = logging.getLogger(__name__)
-
-
-class State(ABC):
-    @abstractmethod
-    def get_data_raw(self):
-        pass
 
 
 @dataclasses.dataclass(frozen=True)
@@ -103,89 +95,32 @@ class YtState(State):
         }
 
 
-class AbstractScraper(ABC):
-    @abstractmethod
-    def get_download_continuation_request(self, state: State) -> requests.Response:
-        pass
+# class AbstractScraper(ABC):
+#     @abstractmethod
+#     def get_download_continuation_request(self, state: State) -> requests.Response:
+#         pass
 
-    def download_continuation_json(self, state: State):
+#     def download_continuation_json(self, state: State):
 
-        with self.get_download_continuation_request(state=state) as res:
-            data = res.json()
-            if data is None:
-                _logger.warning("Decoding data, res options are %s", dir(res))
-            return data
+#         with self.get_download_continuation_request(state=state) as res:
+#             data = res.json()
+#             if data is None:
+#                 _logger.warning("Decoding data, res options are %s", dir(res))
+#             return data
 
 
-class YtPostScraper(AbstractScraper):
-    def __init__(self, base_dir: str | None, graft_url: str, /, wait_time: float = 5.0) -> None:
-        self._base_dir: str | None = base_dir
+class YtPostScraper(Scraper):
+    def __init__(self, *, base_dir: str | None, graft_url: str, wait_time: float = 5.0) -> None:
         self.graft_url: str = graft_url
-        self.wait_time: float = wait_time
+        super().__init__(base_dir=base_dir, wait_time=wait_time)
 
-        if self._base_dir is not None:
-            assert os.path.exists(self._base_dir) and os.path.isdir(self._base_dir), (
-                "Scraping store directory does not exist"
-            )
-
-    # OVERRIDES
-    @property
-    def base_dir(self):
-        return self._base_dir
-
-    def get_download_continuation_request(self, state: State) -> requests.Response:
-        DATARAW = state.get_data_raw()
-        return requests.post(
-            url="https://www.youtube.com/youtubei/v1/browse",
-            params={"prettyPrint": "false"},
-            timeout=3000,
-            headers={
-                "origin": "https://www.youtube.com",
-                "content-type": "application/json",
-                "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-            },
-            json=DATARAW,
-        )
-
-    # NEW METHODS
-    def runloop(self, continuation: str, tracking_params: str):
-
-        state = YtState(continuation, tracking_params, self.graft_url)
-        index = 1
-        while 1:
-            _logger.info("Iteration: %s, currentState: %s", index, state)
-            json_obj = self.download_continuation_json(state)
-            yield json_obj
-            # save the JSON for later
-            if self.base_dir is not None:
-                out_path = os.path.join(self.base_dir, f"out_{index}.json")
-                with open(out_path, "w") as f_out:
-                    json.dump(fp=f_out, obj=json_obj, indent=2)
-
-            ans = find_key_rec(json_obj, "continuationCommand")
-            if ans is None:
-                break
-            p, c2 = ans
-            _logger.debug("Path to continuation command: %s", p)
-            _logger.debug("continuationCommand: %s", c2)
-            # Get new token and trackingParams and build a new State
-            c = c2.get("token")
-            t = json_obj.get("trackingParams")
-
-            assert c is not None
-            index += 1
-            state = YtState(c, t, self.graft_url)
-            time.sleep(self.wait_time)
-
-    def download_page(self):
-
+    def download_page(self) -> str:
         with urlopen(self.graft_url, timeout=3000) as f:
             data = f.read()
 
         return data
 
-    def retrieve_contiunationcommand_and_tracking_param_from_soup(self, soup):
-
+    def find_initial_state(self, soup) -> State | None:
         # step 1, download the PAGE, And get it into RAM
         # Step 2, extract the correct script definition
         scripts = soup.find_all("script")
@@ -210,22 +145,100 @@ class YtPostScraper(AbstractScraper):
 
         trackingParams: str = json_obj["trackingParams"]
         assert isinstance(trackingParams, str)
-        return command, trackingParams
 
-    def run(self, eager: bool):
-        """Download page and start an iterative loop"""
-        html_data = self.download_page()
-        soup = BeautifulSoup(html_data, features="html.parser")
-        ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
-        if not ans1:
-            _logger.error("No tokens found")
-            return "", []
-        c, t = ans1
-        jsons = self.runloop(c, t)
-        if eager:
-            # if not lazy, listify the JSON element
-            jsons = list(jsons)
-        return html_data, jsons
+        state = YtState(continuationToken=command, trackingParams=trackingParams, graft_url=self.graft_url)
+        return state
+
+    def download_continuation(self, state):
+        with self.get_download_continuation_request(state=state) as res:
+            data = res.json()
+            if data is None:
+                _logger.warning("Decoding data, res options are %s", dir(res))
+            return data
+
+    def find_next_state(self, json_obj, prev_state) -> State | None:
+
+        ans = find_key_rec(json_obj, "continuationCommand")
+        if ans is None:
+            return None
+        p, c2 = ans
+        _logger.debug("Path to continuation command: %s", p)
+        _logger.debug("continuationCommand: %s", c2)
+        # Get new token and trackingParams and build a new State
+        c = c2.get("token")
+        t = json_obj.get("trackingParams")
+
+        assert c is not None
+        state = YtState(c, t, self.graft_url)
+        return state
+
+    def urls_from_initial(self, soup) -> list:
+        # this scraper has 0 urls in the original soup
+        return []
+
+    def urls_from_json(self, j) -> list:
+        # the caller should post-process these urls, because not all are valid
+        answer = find_keys_rec_without_path(j, "url")
+        return answer
+
+    def get_download_continuation_request(self, state: State) -> requests.Response:
+        DATARAW = state.get_data_raw()
+        return requests.post(
+            url="https://www.youtube.com/youtubei/v1/browse",
+            params={"prettyPrint": "false"},
+            timeout=3000,
+            headers={
+                "origin": "https://www.youtube.com",
+                "content-type": "application/json",
+                "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+            },
+            json=DATARAW,
+        )
+
+    # # NEW METHODS
+    # def runloop(self, continuation: str, tracking_params: str):
+
+    #     state = YtState(continuation, tracking_params, self.graft_url)
+    #     index = 1
+    #     while 1:
+    #         _logger.info("Iteration: %s, currentState: %s", index, state)
+    #         json_obj = self.download_continuation(state)
+    #         yield json_obj
+    #         # save the JSON for later
+    #         if self.base_dir is not None:
+    #             out_path = os.path.join(self.base_dir, f"out_{index}.json")
+    #             with open(out_path, "w") as f_out:
+    #                 json.dump(fp=f_out, obj=json_obj, indent=2)
+
+    #         ans = find_key_rec(json_obj, "continuationCommand")
+    #         if ans is None:
+    #             break
+    #         p, c2 = ans
+    #         _logger.debug("Path to continuation command: %s", p)
+    #         _logger.debug("continuationCommand: %s", c2)
+    #         # Get new token and trackingParams and build a new State
+    #         c = c2.get("token")
+    #         t = json_obj.get("trackingParams")
+
+    #         assert c is not None
+    #         index += 1
+    #         state = YtState(c, t, self.graft_url)
+    #         time.sleep(self.wait_time)
+
+    # def run(self, eager: bool):
+    #     """Download page and start an iterative loop"""
+    #     html_data = self.download_page()
+    #     soup = BeautifulSoup(html_data, features="html.parser")
+    #     ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
+    #     if not ans1:
+    #         _logger.error("No tokens found")
+    #         return "", []
+    #     c, t = ans1
+    #     jsons = self.runloop(c, t)
+    #     if eager:
+    #         # if not lazy, listify the JSON element
+    #         jsons = list(jsons)
+    #     return html_data, jsons
 
 
 def main():
