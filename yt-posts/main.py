@@ -127,12 +127,13 @@ class YtPostScraper(Scraper):
 
         if not scripts:
             _logger.error("No Script found")
-            return
+            return None
 
         # YOLO to find the continuation command which ends in %3D%3D
         scripts = [x for x in scripts if x.text.startswith("var ytInitialData")]
         if not scripts:
             _logger.error("Non of the scripts define the variable ytInitialData")
+            return None
         value = str(scripts[0].text.removesuffix(";").removeprefix("var ytInitialData = "))
         json_obj = json.loads(value)
         # Step 3 find and return the continuationCommand
@@ -143,7 +144,7 @@ class YtPostScraper(Scraper):
         continationToken = command["token"]
         assert isinstance(continationToken, str)
 
-        trackingParams: str = json_obj["trackingParams"]
+        trackingParams = json_obj["trackingParams"]
         assert isinstance(trackingParams, str)
 
         state = YtState(continuationToken=continationToken, trackingParams=trackingParams, graft_url=self.graft_url)

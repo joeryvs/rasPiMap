@@ -1,4 +1,5 @@
 import collections.abc
+import datetime
 import logging
 import os
 import pathlib
@@ -18,7 +19,12 @@ extensions = {
 
 
 def download_from_web(
-    urls: collections.abc.Iterable[str], /, target_directory: str, overwrite=True, update_extension=False
+    urls: collections.abc.Iterable[str],
+    /,
+    target_directory: str,
+    overwrite=True,
+    update_extension=False,
+    update_write_date=True,
 ):
     if target_directory:
         os.makedirs(target_directory, exist_ok=True)
@@ -37,6 +43,21 @@ def download_from_web(
             _logger.info("[%s] %s -> %s", i, url, new_file)
             with open(new_file, "wb") as f:
                 f.write(res.content)
+            if update_write_date:
+                write_date = res.headers["Last-Modified"]
+                if write_date:
+                    try:
+                        # Source - https://stackoverflow.com/a/1472008
+                        # Posted by SilentGhost
+                        # Retrieved 2026-09-04, License - CC BY-SA 2.5
+                        write_date = datetime.datetime.strptime(write_date, "%a, %d %b %Y %H:%M:%S GMT").replace(
+                            tzinfo=datetime.timezone.utc
+                        )
+
+                        write_date = write_date.timestamp()
+                        os.utime(new_file, times=(write_date, write_date))
+                    except ValueError:
+                        _logger.error("Error parsing date of [%s], %s is not valid date", i, write_date)
 
 
 def find_unused_filename(original_filename: str) -> str:
