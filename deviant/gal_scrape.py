@@ -50,6 +50,43 @@ def run_single_page(users: list[str] | str, wait: float):
         wget_utils.curl_download(url=user_url, output_file=user_output)
 
 
+def run_single_user(user, wait: float):
+
+    assert isinstance(user, str)
+    assert isinstance(wait, float)
+
+    if wait < 0.0:
+        raise ValueError("Wait time should be positive")
+    user = _validate_user_name(user)
+    from urllib import parse
+
+    from bs4 import BeautifulSoup
+
+    user_dir = os.path.join(os.path.dirname(__file__), "gallery-pages", user)
+    os.makedirs(user_dir, exist_ok=True)
+    index = 1
+    target_url = f"https://www.deviantart.com/{user}/gallery?page=1"
+    while target_url:
+        target = os.path.join(user_dir, f"gallery_page_{index}.html")
+        wget_utils.curl_download(target_url, target)
+        index += 1
+
+        # read the file again
+        with open(target, "r") as f:
+            soup = BeautifulSoup(f.read(), features="html.parser")
+        # find the next one, 1) using the string param doesnt work correctly, 2) replace == with ordinal compare
+        next_anchors = [anchor for anchor in soup.find_all("a") if anchor.text == "Next"]
+
+        if not next_anchors:
+            break
+        new_target = next_anchors[0]
+        # the original HREF is an http link, replace with https
+        href = new_target["href"]
+        _, *parts = parse.urlparse(href)
+        target_url = parse.urlunparse(["https", *parts])
+        wget_utils.pause_execution(wait, True)
+
+
 def run_daily(wait: float = 0.2):
 
     today = datetime.now(tz=timezone.utc)
@@ -119,9 +156,12 @@ def main():
 
     subparsers = parser.add_subparsers()
     single_page_parser = subparsers.add_parser("single", parents=[time_parser])
-
     single_page_parser.add_argument("users", type=_validate_user_name, nargs="+")
     single_page_parser.set_defaults(func=run_single_page)
+
+    single_user_parser = subparsers.add_parser("full", parents=[time_parser])
+    single_user_parser.add_argument("user", type=_validate_user_name)
+    single_user_parser.set_defaults(func=run_single_user)
 
     multi_page_parser = subparsers.add_parser("multi", parents=[time_parser])
     multi_page_parser.add_argument("user", type=_validate_user_name)

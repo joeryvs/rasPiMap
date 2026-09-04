@@ -1,4 +1,4 @@
-import argparse
+#!../venv/bin/python
 import logging
 import os
 
@@ -8,14 +8,13 @@ from database import create_db, fill_with_json_data, update_file_times
 from extractors import (
     ArtPageExtractor,
     DescriptionExtractor,
-    HighestUserExtractor,
     JsonExtractor,
     JsonImagePreUrlExtractor,
     MainImageExtractor,
     StoryExtractor,
     TagPageExtractor,
 )
-from utils import FileWriter, IOWriter, Reader
+from utils import FileWriter, Reader
 
 VERSION = "1.0"
 _logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ def run(
     skip_gallery_download: bool,
     skip_pages_download: bool,
     skip_image_download: bool,
-    pages_download_cutoff: int,
+    images_from_gallery: bool,
     post_process: bool,
 ):
     _logger.info("running process for %s", user)
@@ -46,27 +45,18 @@ def run(
         post_process,
     )
     _logger.info(
-        "Wait time page %s, Wait time image %s, pages download cutoff %s",
+        "Wait time page %s, Wait time image %s, images from gallery %s",
         wait_pages,
         wait_images,
-        pages_download_cutoff,
+        images_from_gallery,
     )
 
     reader = Reader()
-    gal_page = f"{user}_gal_page_1.html"
     gal_pages = f"gallery-pages/{user}/"
     if not skip_gallery_download:
         # Download gallary
-        gal_scrape.run_single_page(users=user, wait=wait_pages)
-        writer = IOWriter()
-        HighestUserExtractor(reader=reader, writer=writer).extract(input_path=gal_page)
-        str_buffer = writer.get_buffer
-        AMOUNT = int(str_buffer.getvalue())
-        _logger.info("Downloading %s gallary pages for %s", AMOUNT, user)
-        gal_scrape.run_multi_page(user=user, start_amount=1, end_amount=AMOUNT, wait=wait_pages)
-    else:
-        AMOUNT = len(next(os.walk(gal_pages))[2])
-    if pages_download_cutoff < AMOUNT:
+        gal_scrape.run_single_user(user=user, wait=wait_pages)
+    if images_from_gallery:
         json_pre_image = f"{user}_json_pre_image.txt"
         if not os.path.isfile(json_pre_image):
             JsonImagePreUrlExtractor(reader=reader, writer=FileWriter(json_pre_image)).extract(
@@ -132,21 +122,22 @@ def run(
 
 
 def main():
+    from argparse import ArgumentParser, BooleanOptionalAction
 
     logging.basicConfig(level="DEBUG")
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
 
     parser.add_argument("user", type=str)
-    parser.add_argument("--skip-gallery-download", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--skip-pages-download", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--skip-image-download", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--skip-gallery-download", action=BooleanOptionalAction, default=False)
+    parser.add_argument("--skip-pages-download", action=BooleanOptionalAction, default=False)
+    parser.add_argument("--skip-image-download", action=BooleanOptionalAction, default=False)
     parser.add_argument(
-        "--pages-download-cutoff",
-        type=int,
-        default=20,
-        help="If there are more gallary pages that this number download directly from the gallary and skip the pages",
+        "--images-from-gallery",
+        action=BooleanOptionalAction,
+        default=True,
+        help="If set, dont download the pages, but download the previes images from the gallary directly",
     )
-    parser.add_argument("--post-process", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--post-process", action=BooleanOptionalAction, default=False)
 
     parser.add_argument("--wait-pages", type=float, default=6.0)
     parser.add_argument("--wait-images", type=float, default=3.0)
@@ -161,7 +152,7 @@ def main():
         skip_gallery_download=args.skip_gallery_download,
         skip_pages_download=args.skip_pages_download,
         skip_image_download=args.skip_image_download,
-        pages_download_cutoff=args.pages_download_cutoff,
+        images_from_gallery=args.images_from_gallery,
         post_process=args.post_process,
     )
 

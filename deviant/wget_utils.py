@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!../venv/bin/python
 """
 Download utility as an easy way to get file from the net
 
@@ -315,6 +315,9 @@ def download_from_stream(urls, directory_prefix: str, *, wait_time: float = 0, r
 
 def download_from_file(input_file, directory_prefix: str, *, wait_time: float = 0, random_wait: bool = False):
 
+    if not os.path.isfile(input_file):
+        print(f"ERROR {input_file} does not exist")
+
     with open(input_file, "r") as f:
         return download_from_stream(
             [x.strip() for x in f], directory_prefix=directory_prefix, wait_time=wait_time, random_wait=random_wait
@@ -339,75 +342,18 @@ def main():
 
     parser.add_argument("-V", "--version", action="version", version=__version__)
 
-    parser.add_argument("url")
-    parser.add_argument(
-        "-b",
-        "--background",
-        help="Go  to  background immediately after startup.  If no output file is specified via the -o, output is redirected to wget-log.",
-    )
-    parser.add_argument(
-        "-e",
-        "--execute",
-        help="Execute command as if it were a part of .wgetrc.   A  command  thus invoked will be executed after the commands in .wgetrc, thus taking precedence  over them.  If you need to specify more than one wgetrc               command, use multiple instances of -e.",
-    )
+    parser.add_argument("url", nargs="*")
+    parser.add_argument("-b", "--background")
+    parser.add_argument("-e", "--execute")
     # logging
-    parser.add_argument(
-        "-o",
-        "--output-file",
-        help="""Log all messages to logfile.  The messages are normally reported to
-               standard error.""",
-    )
-    parser.add_argument(
-        "-a",
-        "--append-output",
-        help="""Append to logfile.  This is the same as  -o,  only  it  appends  to
-               logfile  instead  of overwriting the old log file.  If logfile does
-               not exist, a new file is created.
-""",
-    )
-    parser.add_argument(
-        "-d",
-        "--debug",
-        dest="debug",
-        action="store_true",
-        help="""           Turn on debug output, meaning various information important to  the
-    developers  of  Wget  if  it  does  not work properly.  Your system
-    administrator  may  have  chosen  to  compile  Wget  without  debug
-    support,  in  which  case  -d  will  not  work.   Please  note that
-    compiling with debug support is always  safe---Wget  compiled  with
-    the  debug  support  will not print any debug info unless requested
-    with -d.
-""",
-    )
-    parser.add_argument(
-        "-q",
-        "--queit",
-        help="""Turn off Wget's output.
-""",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        help="""           Turn on verbose output, with all the available data.   The  default
-    output is verbose.
-""",
-        dest="verbose",
-        action="store_true",
-    )
-    parser.add_argument(
-        "-nv",
-        "--no-verbose",
-        dest="verbose",
-        action="store_false",
-        help="""         Turn  off verbose without being completely quiet (use -q for that),
-      which means that error messages and  basic  information  still  get
-      printed.
-""",
-    )
+    parser.add_argument("-o", "--output-file")
+    parser.add_argument("-a", "--append-output")
+    parser.add_argument("-d", "--debug", dest="debug", action="store_true")
+    parser.add_argument("-q", "--quiet")
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
+    parser.add_argument("-nv", "--no-verbose", action="store_false")
 
-    parser.add_argument(
-        "--report-speed", choices=["bits"], help="Output bandwidth as type.  The only accepted value is bits."
-    )
+    parser.add_argument("--report-speed", choices=["bits"])
     parser.add_argument("-i", "--input-file", dest="input_file")
     parser.add_argument("--input-metalink")
     parser.add_argument("--keep-badhash")
@@ -443,8 +389,7 @@ def main():
     parser.add_argument("--connect-timeout")
     parser.add_argument("--read-timeout")
     parser.add_argument("--limit-rate")
-    parser.add_argument("--spider")
-    parser.add_argument("-w", "--wait", type=float, dest="wait_times")
+    parser.add_argument("-w", "--wait", type=float, dest="wait")
     parser.add_argument("--waitretry")
     parser.add_argument("--random-wait", action=BooleanOptionalAction, default=False)
     parser.add_argument("--no-proxy")
@@ -453,8 +398,8 @@ def main():
     parser.add_argument(
         "--restrict-file-names", choices=["unix", "windows", "nocontrol", "ascii", "lowercase", "uppercase"]
     )
-    parser.add_argument("-6","--init6-only")
-    parser.add_argument("-4","--init4-only")
+    parser.add_argument("-6", "--init6-only")
+    parser.add_argument("-4", "--init4-only")
     parser.add_argument("--prefer-family")
     parser.add_argument("--retry-connrefused")
 
@@ -467,20 +412,38 @@ def main():
     parser.add_argument("--unlink")
 
     # Directory Options
-    parser.add_argument("-nd","--no-directories")
-    parser.add_argument("--ask-password")
-    parser.add_argument("--ask-password")
-
+    parser.add_argument("-nd", "--no-directories")
 
     parser.add_argument("-P", "--directory-prefix", dest="directory_prefix")
     args = parser.parse_args()
 
     # print(options)
     print(args)
-    filename = download_file(args.url, out=args.output)
+    if args.quiet:
+        logging.basicConfig(level=logging.WARNING)
+    if args.no_verbose:
+        logging.basicConfig(level=logging.NOTSET)
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO)
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
 
-    print()
-    print("Saved under %s" % filename)
+    if args.url:
+        for url in args.url:
+            filename = download_file(url)
+
+            print()
+            print("Saved under %s" % filename)
+
+    elif args.input_file:
+        download_from_file(
+            input_file=args.input_file,
+            directory_prefix=args.directory_prefix,
+            wait_time=args.wait,
+            random_wait=args.random_wait,
+        )
+    else:
+        print("Provide either URL or --input-file")
 
 
 if __name__ == "__main__":
