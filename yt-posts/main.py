@@ -270,7 +270,7 @@ class YtFactory(Factory):
         return f"{begin}=s{'-'.join(x)}"
 
     def keep_url(self, url: str) -> bool:
-        return url.startswith("https://yt3.gghpt.com")
+        return url.startswith("https://yt3.ggpht.com")
 
 
 def main():

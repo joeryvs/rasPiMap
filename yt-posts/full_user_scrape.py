@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 
+import extract
 from download_utils import download_from_web
 from main import YtFactory, YtPostScraper
 from utils import print_iter_item, unique
@@ -11,7 +12,14 @@ VERSION = "0.2"
 
 
 def full_scrape_user(
-    user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_temp_urls: bool, eager: bool
+    user: str,
+    wait_time: float,
+    *,
+    save_json: bool,
+    save_urls: bool,
+    save_temp_urls: bool,
+    eager: bool,
+    from_json: bool = False,
 ):
 
     _logger.debug("Scraping user %s", user)
@@ -21,17 +29,20 @@ def full_scrape_user(
     if os.path.isdir(json_directory):
         # Early return because the existence of the directory implies this user is already scraped
         _logger.warning("User %s has already been scraped today", user)
-        return
-    if save_json:
+        if not from_json:
+            return
+    elif save_json:
         os.makedirs(json_directory)
     else:
         json_directory = None
 
-    graft_url = f"https://www.youtube.com/@{user.strip().removeprefix('@')}/posts"
-
     # use the functionality in main.py to downlaod the URLS
-    scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
-    all_urls = scraper.run()
+    if from_json and json_directory:
+        # TODO, replace with function inside factory
+        all_urls = extract.get_by_pattern(json_directory, "h")
+    else:
+        scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
+        all_urls = scraper.run()
     if eager:
         all_urls = list(all_urls)
     if save_temp_urls:
@@ -75,6 +86,7 @@ def main():
     parser.add_argument("--wait-time", type=float, default=4.0)
 
     parser.add_argument("--save-json", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--from-json", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--save-urls", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--save-temp-urls", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument(
@@ -89,6 +101,7 @@ def main():
     wait_time = args.wait_time
     save_json = args.save_json
     save_urls = args.save_urls
+    from_json = args.from_json
     save_temp_urls = args.save_temp_urls
     eager = args.eager
     for user in users:
@@ -98,6 +111,7 @@ def main():
             save_json=save_json,
             save_urls=save_urls,
             save_temp_urls=save_temp_urls,
+            from_json=from_json,
             eager=eager,
         )
 

@@ -55,7 +55,7 @@ class Scraper(ABC):
         print(ans1)
         if not ans1:
             _logger.error("No Initial State found")
-            return []
+            return
         jsons = self.run_loop(ans1)
         # Make jsons eager
         yield from self.urls_from_initial(soup)
