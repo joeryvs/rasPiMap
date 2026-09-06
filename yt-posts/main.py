@@ -7,7 +7,7 @@ import os
 from urllib.request import urlopen
 
 import requests
-from base import Scraper, State
+from base import Factory, Scraper, State
 from utils import find_key_rec, find_keys_rec_without_path
 
 _logger = logging.getLogger(__name__)
@@ -239,6 +239,38 @@ class YtPostScraper(Scraper):
     #         # if not lazy, listify the JSON element
     #         jsons = list(jsons)
     #     return html_data, jsons
+
+
+class YtFactory(Factory):
+    def __init__(self, user: str) -> None:
+        assert isinstance(user, str)
+        self.user = user.strip().removeprefix("@")
+        assert user
+        assert all(char.isprintable() for char in user)
+        # TODO proper check, alpha-numeric characters or . or _ or - and some others
+        super().__init__()
+
+    def get_scraper(self, *, base_dir: str | None, wait_time: float) -> Scraper:
+        graft_url = f"https://www.youtube.com/@{self.user}/posts"
+
+        return YtPostScraper(base_dir=base_dir, wait_time=wait_time, graft_url=graft_url)
+
+    def post_process_url(self, url: str) -> str:
+        # vim macro is 0nllc9e4000 + Esc + j0
+        # now as a python function
+        # YOLO
+        parts = url.split("=s", 1)
+        assert len(parts) == 2
+        begin, end = parts
+        x = end.split("-")
+        # set the first element to 4000, this ensure a large image is downloaded
+        x[0] = "4000"
+        # remove part 1 and 2, this makes sure the image is not cropped
+        x[1:3] = []
+        return f"{begin}=s{'-'.join(x)}"
+
+    def keep_url(self, url: str) -> bool:
+        return url.startswith("https://yt3.gghpt.com")
 
 
 def main():

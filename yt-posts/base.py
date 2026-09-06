@@ -1,3 +1,4 @@
+import collections.abc
 import json
 import logging
 import os
@@ -46,7 +47,7 @@ class Scraper(ABC):
     def urls_from_json(self, j) -> list:
         pass
 
-    def run(self):
+    def run(self) -> collections.abc.Iterable:
         """Download page and start an iterative loop"""
         html_data = self.download_page()
         soup = BeautifulSoup(html_data, features="html.parser")
@@ -57,29 +58,61 @@ class Scraper(ABC):
             return []
         jsons = self.run_loop(ans1)
         # Make jsons eager
-        jsons = list(jsons)
-        all_urls = []
-        all_urls.extend(self.urls_from_initial(soup))
+        yield from self.urls_from_initial(soup)
         for j in jsons:
-            all_urls.extend(self.urls_from_json(j))
+            yield from self.urls_from_json(j)
 
-        return all_urls
-
-    def run_loop(self, initial_state):
+    def run_loop(self, initial_state) -> collections.abc.Iterable:
         index = 1
         state = initial_state
-        jsons = []
         while state is not None:
             _logger.info("Iteration: %s, currentState: %s", index, state)
             json_obj = self.download_continuation(state)
-            jsons.append(json_obj)
             # save the JSON for later
             if self.base_dir:
                 out_path = os.path.join(self.base_dir, f"out_{index}.json")
                 with open(out_path, "w") as f_out:
                     json.dump(fp=f_out, obj=json_obj, indent=2)
+            yield json_obj
 
             state = self.find_next_state(json_obj, state)
             time.sleep(self.wait_time)
             index += 1
-        return jsons
+
+
+class EagerScraper(Scraper):
+    def __init__(self, *, scraper: Scraper) -> None:
+        self._scraper = scraper
+        super().__init__(base_dir=scraper.base_dir, wait_time=scraper.wait_time)
+
+    def download_continuation(self, state):
+        return self._scraper.download_continuation(state)
+
+    def download_page(self) -> str:
+        return self._scraper.download_page()
+
+    def urls_from_json(self, j) -> list:
+        return list(self._scraper.urls_from_json(j=j))
+
+    def urls_from_initial(self, soup) -> list:
+        return list(self._scraper.urls_from_initial(soup=soup))
+
+    def run(self):
+        return list(self._scraper.run())
+
+    def run_loop(self, initial_state):
+        return list(self._scraper.run_loop(initial_state))
+
+
+class Factory(ABC):
+    @abstractmethod
+    def get_scraper(self, *, base_dir: str | None, wait_time: float) -> Scraper:
+        """Return a specific scraper"""
+
+    def post_process_url(self, url: str) -> str:
+        """Changes the url from the cropped version to an url which should retrieve the full size image"""
+        return url
+
+    def keep_url(self, url: str) -> bool:
+        """Predicate to determine if the"""
+        return True

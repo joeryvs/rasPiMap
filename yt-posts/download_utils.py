@@ -44,7 +44,7 @@ def download_from_web(
             with open(new_file, "wb") as f:
                 f.write(res.content)
             if update_write_date:
-                write_date = res.headers["Last-Modified"]
+                write_date = res.headers.get("Last-Modified")
                 if write_date:
                     try:
                         # Source - https://stackoverflow.com/a/1472008

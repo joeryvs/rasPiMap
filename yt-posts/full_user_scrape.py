@@ -3,7 +3,7 @@ import logging
 import os
 
 from download_utils import download_from_web
-from main import YtPostScraper
+from main import YtFactory, YtPostScraper
 from utils import print_iter_item, unique
 
 _logger = logging.getLogger(__name__)
@@ -15,6 +15,7 @@ def full_scrape_user(
 ):
 
     _logger.debug("Scraping user %s", user)
+    factory = YtFactory(user=user)
     input_file = f"{user}-full-urls.txt"
     json_directory = datetime.datetime.now(tz=datetime.timezone.utc).strftime("{}-%Y-%j").format(user)
     if os.path.isdir(json_directory):
@@ -29,17 +30,17 @@ def full_scrape_user(
     graft_url = f"https://www.youtube.com/@{user.strip().removeprefix('@')}/posts"
 
     # use the functionality in main.py to downlaod the URLS
-    scraper = YtPostScraper(base_dir=json_directory, graft_url=graft_url, wait_time=wait_time)
+    scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
     all_urls = scraper.run()
     if eager:
         all_urls = list(all_urls)
     if save_temp_urls:
         all_urls = print_iter_item(f"{user}-full-temp-urls.txt", all_urls)
 
-    urls = (x for x in all_urls if x.startswith("https://yt3.ggpht.com"))
+    urls = (x for x in all_urls if factory.keep_url(x))
     if save_temp_urls:
         urls = print_iter_item(f"{user}-full-filtered-urls.txt", urls)
-    urls = unique(map(yt_crop_to_full_url, urls))
+    urls = unique(map(factory.post_process_url, urls))
     if save_urls:
         urls = print_iter_item(input_file, urls)
     if eager:
