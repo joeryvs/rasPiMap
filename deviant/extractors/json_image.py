@@ -81,9 +81,13 @@ class JsonImageUrlExtractor(Extractor):
         important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
         # kinda dangeroues to run arbartraty code,
         important = eval(important, {}, {})
-        json_obj = json.loads(important)
-        _logger.debug("evaluated line of %s", json_obj)
-        return json_obj
+        try:
+            json_obj = json.loads(important)
+            _logger.debug("evaluated line of %s", json_obj)
+            return json_obj
+        except json.JSONDecodeError as e:
+            _logger.critical("Couldnt parse, error: %s", e.msg)
+            return {}
 
 
 class JsonImagePreUrlExtractor(JsonImageUrlExtractor):

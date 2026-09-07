@@ -19,6 +19,7 @@ from extractors import (
     JsonImagePreUrlExtractor,
     JsonImageUrlExtractor,
     LargestImageExtractor,
+    LinkExtractor,
     MainImageExtractor,
     NoCropImageExtractor,
     NoCropImageExtractorLarge,
@@ -26,6 +27,7 @@ from extractors import (
     StoryExtractor,
     TagPageExtractor,
     UserPageExtractor,
+    VideoExtractor,
 )
 from utils import Extractor
 
@@ -58,6 +60,8 @@ class ExtractorFactory:
             "deviantart.additionalmedia": JsonAdditionalMediaExtractor,
             "json_perm": JsonImagePermutationExtractor,
             "json_art_pre": JsonImagePreUrlExtractor,
+            "video": VideoExtractor,
+            "link": LinkExtractor,
         }
 
     @property

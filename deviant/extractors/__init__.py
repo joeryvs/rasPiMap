@@ -19,6 +19,7 @@ from .json_image import (
 from .main_image import MainImageExtractor
 from .no_crop_image import NoCropImageExtractor, NoCropImageExtractorLarge
 from .page import AllPagesExtractor, ArtPageExtractor, PageExtractor, TagPageExtractor, UserPageExtractor
+from .video import LinkExtractor, VideoExtractor
 
 __all__ = [
     "AllPagesExtractor",
@@ -38,6 +39,7 @@ __all__ = [
     "JsonImagePreUrlExtractor",
     "JsonImageUrlExtractor",
     "LargestImageExtractor",
+    "LinkExtractor",
     "MainImageExtractor",
     "NoCropImageExtractor",
     "NoCropImageExtractorLarge",
@@ -45,4 +47,5 @@ __all__ = [
     "StoryExtractor",
     "TagPageExtractor",
     "UserPageExtractor",
+    "VideoExtractor",
 ]

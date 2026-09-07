@@ -19,6 +19,7 @@ Copyright (c) 2010-2015 anatoly techtonik
 __version__ = "1.0"
 
 
+import datetime
 import logging
 import math
 import os
@@ -91,20 +92,15 @@ def _filename_fix_existing(filename: str) -> str:
     """Expands name portion of filename with numeric ' (x)' suffix to
     return filename that doesn't exist already.
     """
-    dirname = "."
-    if "." in filename:
-        name, ext = filename.rsplit(".", 1)
-    else:
-        name, ext = filename, ""
+    dirname, basename = os.path.split(filename)
+    name, ext = basename.rsplit(".", 1) if "." in basename else (basename, "")
     names = [x for x in os.listdir(dirname) if x.startswith(name)]
     names = [x.rsplit(".", 1)[0] for x in names]
-    suffixes = [x.replace(name, "") for x in names]
+    suffixes = [x.replace(name, "", 1) for x in names]
     # filter suffixes that match ' (x)' pattern
     suffixes = [x[2:-1] for x in suffixes if x.startswith(" (") and x.endswith(")")]
     indexes = [int(x) for x in suffixes if set(x) <= set("0123456789")]
-    idx = 1
-    if indexes:
-        idx += max(indexes)
+    idx = max(indexes) + 1 if indexes else 1
     if ext:
         return "%s (%d).%s" % (name, idx, ext)
     else:
@@ -246,6 +242,33 @@ def _detect_filename(url=None, out=None, headers=None, default="download.wget"):
     return names["out"] or names["headers"] or names["url"] or default
 
 
+def parse_last_modified_header(last_modified_date: str) -> datetime.datetime | None:
+    try:
+        # Source - https://stackoverflow.com/a/1472008
+        # Posted by SilentGhost
+        # Retrieved 2026-09-04, License - CC BY-SA 2.5
+        write_date = datetime.datetime.strptime(last_modified_date, "%a, %d %b %Y %H:%M:%S GMT").replace(
+            tzinfo=datetime.timezone.utc
+        )
+        return write_date
+    except ValueError:
+        _logger.error("Error parsing date of %s is not valid date", last_modified_date)
+        try:
+            write_date = datetime.datetime.strptime(last_modified_date, "%a, %d %b %Y %H:%M:%S UTC").replace(
+                tzinfo=datetime.timezone.utc
+            )
+            return write_date
+        except ValueError:
+            return None
+
+
+def update_write_time_of_file(filename: str, last_modified_date: str):
+    write_date = parse_last_modified_header(last_modified_date=last_modified_date)
+    if write_date:
+        times = (write_date.timestamp(), write_date.timestamp())
+        os.utime(filename, times=times)
+
+
 def curl_download(url: str, output_file: str):
     # download 1 file, and output it, simulating a single curl call
     _logger.debug("Download %s, saving to %s", url, output_file)
@@ -253,7 +276,7 @@ def curl_download(url: str, output_file: str):
         f.write(res.content)
 
 
-def download_file(url, out=None):
+def download_file(url, out=None, *, update_write_time=True):
     """High level function, which downloads URL into tmp file in current
     directory and then renames it to filename autodetected from either URL
     or HTTP headers.
@@ -275,26 +298,33 @@ def download_file(url, out=None):
         # add numeric ' (x)' suffix if filename already exists
         if os.path.exists(filename):
             filename = _filename_fix_existing(filename)
+        # write to file
         with open(filename, "xb") as f:
             f.write(res.content)
         _logger.info("saving %s to %s", res.url, filename)
+
+        if update_write_time and (last_modified_date := headers.get("Last-Modified")):
+            update_write_time_of_file(filename=filename, last_modified_date=last_modified_date)
     # print headers
     return filename
 
 
-def download_from_stream(urls, directory_prefix: str, *, wait_time: float = 0, random_wait=False):
+def download_from_stream(
+    urls, directory_prefix: str, *, wait_time: float = 0, random_wait=False, update_write_time=True
+):
     """High level function, which downloads URLS from a stream, into directory
     renames it to filename autodetected from either URL or HTTP headers.
 
     :param directory_prefix: output filename or directory
     :param wait_time: amount of time to wait between requests
     :param random_wait: boolean flag to fluctuate wait time
+    :param update_write_time: boolean flag to determine if the write_date should be updated
     :return:    status_code
     """
     status_code = 0
     rejected = []
     with requests.Session() as session:
-        for i, url in enumerate(urls):
+        for i, url in enumerate(urls, start=1):
             if i and wait_time >= 0:
                 pause_execution(wait_time, random_wait)
             try:
@@ -313,16 +343,23 @@ def download_from_stream(urls, directory_prefix: str, *, wait_time: float = 0, r
                     with open(filename, "xb") as f:
                         f.write(res.content)
                     _logger.info("[%s] saving %s to %s", i, res.url, filename)
+                    if update_write_time and (last_modified_date := headers.get("Last-Modified")):
+                        update_write_time_of_file(filename, last_modified_date)
+
             except requests.exceptions.RequestException as e:
                 _logger.error("connection error for %s, %s", url, e.filename)
                 rejected.append((url, e))
+                status_code = max(2, status_code)
     return status_code
 
 
-def download_from_file(input_file, directory_prefix: str, *, wait_time: float = 0, random_wait: bool = False):
+def download_from_file(
+    input_file, directory_prefix: str, *, wait_time: float = 0, random_wait: bool = False, update_write_time=True
+):
 
     if not os.path.isfile(input_file):
         print(f"ERROR {input_file} does not exist")
+        return 1
 
     with open(input_file, "r") as f:
         return download_from_stream(
@@ -330,6 +367,7 @@ def download_from_file(input_file, directory_prefix: str, *, wait_time: float = 
             directory_prefix=directory_prefix,
             wait_time=wait_time,
             random_wait=random_wait,
+            update_write_time=update_write_time,
         )
 
 
@@ -352,6 +390,8 @@ def main():
     parser.add_argument("-V", "--version", action="version", version=__version__)
 
     parser.add_argument("url", nargs="*")
+
+    parser.add_argument("--update-write-time", action=BooleanOptionalAction, default=True)
     parser.add_argument("-b", "--background")
     parser.add_argument("-e", "--execute")
     # logging
@@ -428,6 +468,7 @@ def main():
 
     # print(options)
     print(args)
+    update_write_time = args.update_write_time
     if args.quiet:
         logging.basicConfig(level=logging.WARNING)
     if args.no_verbose:
@@ -439,7 +480,7 @@ def main():
 
     if args.url:
         for url in args.url:
-            filename = download_file(url)
+            filename = download_file(url, update_write_time=update_write_time)
 
             print()
             print("Saved under %s" % filename)
@@ -450,6 +491,7 @@ def main():
             directory_prefix=args.directory_prefix,
             wait_time=args.wait,
             random_wait=args.random_wait,
+            update_write_time=update_write_time,
         )
     else:
         print("Provide either URL or --input-file")
