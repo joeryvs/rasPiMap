@@ -13,6 +13,7 @@ from extractors import (
     DeviantArtLargeImageExtractor,
     HighestUserExtractor,
     ImageExtractor,
+    JsonAdditionalMediaExtractor,
     JsonExtractor,
     JsonImagePermutationExtractor,
     JsonImagePreUrlExtractor,
@@ -54,6 +55,7 @@ class ExtractorFactory:
             "story": StoryExtractor,
             "json": JsonExtractor,
             "json_art": JsonImageUrlExtractor,
+            "deviantart.additionalmedia": JsonAdditionalMediaExtractor,
             "json_perm": JsonImagePermutationExtractor,
             "json_art_pre": JsonImagePreUrlExtractor,
         }

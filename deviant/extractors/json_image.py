@@ -65,21 +65,25 @@ class JsonImageUrlExtractor(Extractor):
 
     def retrieve(self, input_path):
         a = self.find_elements(input_path, "script", id="_R_")
-        for b in a:
-            text = b.text
-            lines = text.split("\n")
-            important: str = lines[3]
-            # make a lot of assumption no of the structure
-            important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
-            # kinda dangeroues to run arbartraty code,
-            important = eval(important, {}, {})
-            x = json.loads(important)
-            _logger.debug("evaluated line of %s", x)
+        for script_tag in a:
+            json_obj = self.script_tag_to_json(script_tag)
             # find all "media"
-            medias = self.find_props(x, "media")
+            medias = self.find_props(json_obj, "media")
             # construct url
             urls = [self.construct_url_from_media(media) for media in medias]
             yield from urls
+
+    def script_tag_to_json(self, script_tag):
+        text = script_tag.text
+        lines = text.split("\n")
+        important: str = lines[3]
+        # make a lot of assumption no of the structure
+        important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
+        # kinda dangeroues to run arbartraty code,
+        important = eval(important, {}, {})
+        json_obj = json.loads(important)
+        _logger.debug("evaluated line of %s", json_obj)
+        return json_obj
 
 
 class JsonImagePreUrlExtractor(JsonImageUrlExtractor):
@@ -131,3 +135,16 @@ class JsonImagePermutationExtractor(JsonImageUrlExtractor):
         urls = super().retrieve(input_path=input_path)
         urls = [x for y in urls for x in y]
         return urls
+
+
+class JsonAdditionalMediaExtractor(JsonImageUrlExtractor):
+    def retrieve(self, input_path):
+        a = self.find_elements(input_path, "script", id="_R_")
+        for script_tag in a:
+            json_obj = self.script_tag_to_json(script_tag)
+            # find all "media"
+            additional_medias = self.find_props(json_obj, "additionalMedia")
+            medias = [m["media"] for blob in additional_medias for m in blob if "media" in m]
+            # construct url
+            urls = [self.construct_url_from_media(media) for media in medias]
+            yield from urls

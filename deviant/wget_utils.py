@@ -92,7 +92,10 @@ def _filename_fix_existing(filename: str) -> str:
     return filename that doesn't exist already.
     """
     dirname = "."
-    name, ext = filename.rsplit(".", 1)
+    if "." in filename:
+        name, ext = filename.rsplit(".", 1)
+    else:
+        name, ext = filename, ""
     names = [x for x in os.listdir(dirname) if x.startswith(name)]
     names = [x.rsplit(".", 1)[0] for x in names]
     suffixes = [x.replace(name, "") for x in names]
@@ -102,7 +105,10 @@ def _filename_fix_existing(filename: str) -> str:
     idx = 1
     if indexes:
         idx += max(indexes)
-    return "%s (%d).%s" % (name, idx, ext)
+    if ext:
+        return "%s (%d).%s" % (name, idx, ext)
+    else:
+        return "%s (%d)" % (name, idx)
 
 
 # --- terminal/console output helpers ---
@@ -320,7 +326,10 @@ def download_from_file(input_file, directory_prefix: str, *, wait_time: float = 
 
     with open(input_file, "r") as f:
         return download_from_stream(
-            [x.strip() for x in f], directory_prefix=directory_prefix, wait_time=wait_time, random_wait=random_wait
+            [x.strip() for x in f if x.strip() and not x.strip().startswith("#")],
+            directory_prefix=directory_prefix,
+            wait_time=wait_time,
+            random_wait=random_wait,
         )
 
 
@@ -389,7 +398,7 @@ def main():
     parser.add_argument("--connect-timeout")
     parser.add_argument("--read-timeout")
     parser.add_argument("--limit-rate")
-    parser.add_argument("-w", "--wait", type=float, dest="wait")
+    parser.add_argument("-w", "--wait", type=float, dest="wait", default=0)
     parser.add_argument("--waitretry")
     parser.add_argument("--random-wait", action=BooleanOptionalAction, default=False)
     parser.add_argument("--no-proxy")
