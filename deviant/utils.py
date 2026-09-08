@@ -63,11 +63,14 @@ class FileWriter(Writer):
 
         with open(self.output_file, "w") as f:
             for i in items:
+                assert isinstance(i, str)
                 print(i, file=f)
 
     def output_content_to_directory(self, name, content):
+        assert isinstance(content, str)
         path = self.output_file / name
         os.makedirs(self.output_file, exist_ok=True)
+
         with open(path, "w", encoding=sys.getfilesystemencoding()) as f:
             print(content, file=f)
 
@@ -79,6 +82,7 @@ class IOWriter(Writer):
 
     def output_items(self, items):
         for i in items:
+            assert isinstance(i, str)
             print(i, file=self.buffer)
 
     def output_content_to_directory(self, name, content):
@@ -106,6 +110,7 @@ class Extractor(ABC):
     @abstractmethod
     def retrieve(self, input_path) -> Iterable:
         return []
+
 
 class OnePerPageExtractor(Extractor, ABC):
     def extract(self, /, input_path, **kwargs):

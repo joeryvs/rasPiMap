@@ -31,16 +31,12 @@ class JsonImageUrlExtractor(Extractor):
         find_prop_rec(dictionary)
         return result
 
-    def construct_url_from_media(self, media):
+    def construct_urls_from_media(self, media) -> list[str]:
         baseUri: str = media.get("baseUri")
         prettyName: str = media.get("prettyName")
         tokens: list[str] = media.get("token")
         if not baseUri or not prettyName:
             _logger.debug("Missing baseUri or prettyName in %s", media)
-        # if baseUri is None:
-        #     _logger.error("current media has no baseUri: %s", media)
-        # if prettyName is None:
-        #     _logger.error("current media has no prettyName: %s", media)
         if not tokens:
             _logger.warning("No tokens available for %s, %s", prettyName, baseUri)
         token = "?token=" + tokens[0] if tokens else ""
@@ -53,10 +49,10 @@ class JsonImageUrlExtractor(Extractor):
             extension = c.replace("<prettyName>", prettyName or "")
             url = baseUri + extension + token
             _logger.debug("URL for %s is %s", prettyName, url)
-            return url
+            return [url]
         else:
             _logger.info("No fullviews for %s, %s", prettyName, baseUri)
-        return ""
+        return []
 
     def _image_size_order(self) -> list[str]:
         # t is fullview or pre or social_preview
@@ -70,8 +66,8 @@ class JsonImageUrlExtractor(Extractor):
             # find all "media"
             medias = self.find_props(json_obj, "media")
             # construct url
-            urls = [self.construct_url_from_media(media) for media in medias]
-            yield from urls
+            urls: list[list[str]] = [self.construct_urls_from_media(media) for media in medias]
+            yield from [a for b in urls for a in b]
 
     def script_tag_to_json(self, script_tag):
         text = script_tag.text
@@ -97,7 +93,7 @@ class JsonImagePreUrlExtractor(JsonImageUrlExtractor):
 
 
 class JsonImagePermutationExtractor(JsonImageUrlExtractor):
-    def construct_url_from_media(self, media):
+    def construct_urls_from_media(self, media):
         baseUri: str = media.get("baseUri", "")
         prettyName: str = media.get("prettyName", "")
         tokens: list[str] = media.get("token", [])
@@ -135,11 +131,6 @@ class JsonImagePermutationExtractor(JsonImageUrlExtractor):
 
         return all_urls
 
-    def retrieve(self, input_path):  # pyright: ignore[reportIncompatibleMethodOverride]
-        urls = super().retrieve(input_path=input_path)
-        urls = [x for y in urls for x in y]
-        return urls
-
 
 class JsonAdditionalMediaExtractor(JsonImageUrlExtractor):
     def retrieve(self, input_path):
@@ -150,5 +141,43 @@ class JsonAdditionalMediaExtractor(JsonImageUrlExtractor):
             additional_medias = self.find_props(json_obj, "additionalMedia")
             medias = [m["media"] for blob in additional_medias for m in blob if "media" in m]
             # construct url
-            urls = [self.construct_url_from_media(media) for media in medias]
-            yield from urls
+            urls = [self.construct_urls_from_media(media) for media in medias]
+            yield from [a for b in urls for a in b]
+
+
+class JsonVideoAllExtractor(JsonImageUrlExtractor):
+    def construct_urls_from_media(self, media):
+        types: list[dict] = media.get("types")
+        videos = [t for t in types if t["t"] == "video"]
+        return [video["b"] for video in videos]
+
+
+class JsonVideoBestExtractor(JsonImageUrlExtractor):
+    def construct_urls_from_media(self, media):
+        types: list[dict] = media.get("types")
+        videos = [t for t in types if t["t"] == "video"]
+        if not videos:
+            return []
+        m = max(videos, key=lambda x: x["h"])
+        return [m["b"]]
+
+
+class JsonPdfExtractor(JsonImageUrlExtractor):
+    def construct_urls_from_media(self, media) -> list[str]:
+        types: list[dict] = media.get("types")
+        videos = [t for t in types if t["t"] == "pdf"]
+        return [video["s"] for video in videos]
+
+
+class JsonLiteratureUrl(JsonImageUrlExtractor):
+    def retrieve(self, input_path):
+        a = self.find_elements(input_path, "script", id="_R_")
+        for script_tag in a:
+            json_obj = self.script_tag_to_json(script_tag)
+            # find all "media"
+            if json_obj:
+                deviation_dict = json_obj["@@entities"]["deviation"]
+                for v in deviation_dict.values():
+                    if v["type"] == "literature":
+                        url = v["url"]
+                        yield url

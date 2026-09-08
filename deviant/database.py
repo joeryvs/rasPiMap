@@ -107,20 +107,20 @@ def find_image_upload_data(cur: sqlite3.Connection, directory_path) -> Generator
 def fill_with_json_data(db: sqlite3.Connection, directory_path, /, dry_run, max_depth):
 
     cur = db.cursor()
-    # data = create_json_data(directory_path, max_depth)
     data = (
         d
         for json_obj in yield_json_from_directory(directory_path=directory_path, max_depth=max_depth)
         for d in extract_items_from_json(json_obj)
     )
     for image_data, token_data, size_data in data:
-        _ = cur.execute(
-            "INSERT INTO image "
-            "(entityID,publishedDate,media,baseUri,prettyName,hasBlockReasons,shortUrl,Url,PageTitle,title)"
-            "VALUES (?,?,?,?,?,?,?,?,?,?) "
-            "RETURNING entityId",
-            image_data,
-        )
+        if image_data:
+            _ = cur.execute(
+                "INSERT INTO image "
+                "(entityID,publishedDate,media,baseUri,prettyName,hasBlockReasons,shortUrl,Url,PageTitle,title)"
+                "VALUES (?,?,?,?,?,?,?,?,?,?) "
+                "RETURNING entityId",
+                image_data,
+            )
         _logger.debug("Inserted row: %s", cur.lastrowid)
         _ = cur.executemany("INSERT INTO token (entityId,token) VALUES (?,?)", token_data)
 
@@ -171,49 +171,86 @@ def yield_json_from_directory(directory_path, max_depth):
             yield from yield_json_from_directory(full_path_dir, max_depth=max_depth - 1)
 
 
-def extract_items_from_json(obj):
-    def get_file_name(c, pretty_name, base_uri):
-        if F := c.replace("<prettyName>", pretty_name or ""):
-            return pathlib.Path(F).name
-        else:
-            return pathlib.Path(base_uri).name
+def _get_file_name(c, pretty_name, base_uri):
+    if F := c.replace("<prettyName>", pretty_name or ""):
+        return os.path.basename(F)
+    else:
+        return pathlib.Path(base_uri).name
 
-    def create_image_size(id, x, pretty_name, base_uri):
-        _logger.debug("imagesize data: %s", x)
-        width = x["w"]
-        height = x["h"]
-        type = x["t"]
-        C: str = x.get("c", "")
-        F: str = get_file_name(C, pretty_name, base_uri)
-        R = x["r"]
-        yield id, width, height, type, C, F, R
-        if extra_sizes := x.get("ss", []):
-            for x2 in extra_sizes:
-                w2 = x2["w"]
-                h2 = x2["h"]
-                t2 = f"{type}-{x2['x']}x"
-                c2 = x2.get("c", "")
-                f2 = get_file_name(c2, pretty_name, base_uri)
-                yield id, w2, h2, t2, c2, f2, R
+
+def _create_image_size(id, x, pretty_name, base_uri):
+    _logger.debug("imagesize data: %s", x)
+    width = x["w"]
+    height = x["h"]
+    type = x["t"]
+    C: str = x.get("c", "")
+    F: str = _get_file_name(C, pretty_name, base_uri)
+    R = x["r"]
+    yield id, width, height, type, C, F, R
+    if extra_sizes := x.get("ss", []):
+        for x2 in extra_sizes:
+            w2 = x2["w"]
+            h2 = x2["h"]
+            t2 = f"{type}-{x2['x']}x"
+            c2 = x2.get("c", "")
+            f2 = _get_file_name(c2, pretty_name, base_uri)
+            yield id, w2, h2, t2, c2, f2, R
+
+
+def _extract_from_deviation_json(key, value):
+    entityId = value.get("entityId") or value.get("deviationId")
+    _logger.info("Extracting data from %s", entityId)
+    publishDate = value["publishedTime"]
+    media = json.dumps(value["media"])
+    baseUri = value["media"].get("baseUri", "")
+    prettyName = value["media"].get("prettyName", "")
+    hasBlockReasons = len(value["blockReasons"]) > 0
+    shortUrl = value["shortUrl"]
+    url = value["url"]
+    page_title = os.path.basename(url)
+    title = value["title"]
+    assert str(entityId) == str(key), f"{entityId} != {key}"
+    item1 = entityId, publishDate, media, baseUri, prettyName, hasBlockReasons, shortUrl, url, page_title, title
+    tokens = [(entityId, token) for token in (value["media"].get("token", []))]
+    sizes = [y for x in value["media"].get("types", []) for y in _create_image_size(entityId, x, prettyName, baseUri)]
+    yield item1, tokens, sizes
+
+
+def extract_items_from_json(obj):
 
     deviations = obj["@@entities"]["deviation"]
+
     for k, v in deviations.items():
-        entityId = v["entityId"]
-        _logger.info("Extracting data from %s", entityId)
-        publishDate = v["publishedTime"]
-        media = json.dumps(v["media"])
-        baseUri = v["media"].get("baseUri", "")
-        prettyName = v["media"].get("prettyName", "")
-        hasBlockReasons = len(v["blockReasons"]) > 0
-        shortUrl = v["shortUrl"]
-        url = v["url"]
-        page_title = pathlib.Path(url).name
-        title = v["title"]
-        assert str(entityId) == str(k), f"{entityId} != {k}"
-        item1 = entityId, publishDate, media, baseUri, prettyName, hasBlockReasons, shortUrl, url, page_title, title
-        tokens = [(entityId, token) for token in (v["media"].get("token", []))]
-        sizes = [y for x in v["media"].get("types", []) for y in create_image_size(entityId, x, prettyName, baseUri)]
-        yield item1, tokens, sizes
+        yield from _extract_from_deviation_json(key=k, value=v)
+    deviationExtended = obj["@@entities"].get("deviationExtended", {})
+    if deviationExtended:
+        for entity_id, v in deviationExtended.items():
+            additional_media = v.get("additionalMedia", [])
+            for record in additional_media:
+                media = record["media"]
+                prettyName = media["prettyName"]
+                baseUri = media["baseUri"]
+                # I know the tokens are wrong but we care about the link to the publishdate which makes it acceptable
+                tokens = [(entity_id, token) for token in (media.get("token", []))]
+                sizes = [
+                    y for x in media.get("types", []) for y in _create_image_size(entity_id, x, prettyName, baseUri)
+                ]
+                yield None, tokens, sizes
+
+            related_content = v["relatedContent"]
+            for item in related_content:
+                yield from _find_media_in_related_content(item)
+
+
+def _find_media_in_related_content(item):
+    assert isinstance(item, dict)
+    if "users" in item:
+        users = item["users"]
+        for user in users:
+            for dev in user["deviations"]:
+                assert isinstance(dev, dict)
+                entityId = dev.get("entityId") or dev.get("deviationId")
+                yield from _extract_from_deviation_json(key=entityId, value=dev)
 
 
 def read_db(db: sqlite3.Connection):

@@ -15,6 +15,10 @@ from .json_image import (
     JsonImagePermutationExtractor,
     JsonImagePreUrlExtractor,
     JsonImageUrlExtractor,
+    JsonVideoAllExtractor,
+    JsonVideoBestExtractor,
+    JsonPdfExtractor,
+    JsonLiteratureUrl,
 )
 from .main_image import MainImageExtractor
 from .no_crop_image import NoCropImageExtractor, NoCropImageExtractorLarge
@@ -38,6 +42,10 @@ __all__ = [
     "JsonImagePermutationExtractor",
     "JsonImagePreUrlExtractor",
     "JsonImageUrlExtractor",
+    "JsonLiteratureUrl",
+    "JsonPdfExtractor",
+    "JsonVideoAllExtractor",
+    "JsonVideoBestExtractor",
     "LargestImageExtractor",
     "LinkExtractor",
     "MainImageExtractor",
