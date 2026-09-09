@@ -9,7 +9,7 @@ from urllib import parse
 
 import requests
 import utils
-from base import Scraper, State
+from base import Factory, Scraper, State
 from download_utils import download_from_web
 from utils import print_iter_item, unique
 
@@ -161,6 +161,7 @@ def _get_headers(**kwargs) -> dict[str, str]:
     headers = dict(y for y in [tuple(x.split(": ", 1)) for x in headers] if len(y) == 2)
     return headers
 
+
 @dataclasses.dataclass(frozen=True)
 class InstaState:
     end_cursor: str
@@ -198,7 +199,7 @@ class InstaState:
             "server_timestamps": "true",
             "variables": {
                 "after": self.end_cursor,
-                "first": 12,
+                "first": 30,
                 "id": self.id,
             },
             "doc_id": "27389614800735091",
@@ -384,8 +385,32 @@ class InstaScraper(Scraper):
         return state
 
 
+class InstagramFactory(Factory):
+    def __init__(self, *, user) -> None:
+        self.user = user
+        super().__init__()
+        assert isinstance(self.user, str)
+        assert self.user.isalpha()
+
+    def get_scraper(self, *, base_dir: str | None, wait_time: float) -> Scraper:
+        base_url = f"https://www.instagram.com/{self.user}/"
+        html_save_location = f"{self.user}-front_page.html"
+        return InstaScraper(
+            base_url=base_url,
+            html_save_location=html_save_location,
+            base_dir=base_dir,
+            wait_time=wait_time,
+        )
+
+    def post_process_url(self, url: str) -> str:
+        return super().post_process_url(url)
+
+    def keep_url(self, url: str) -> bool:
+        return super().keep_url(url)
+
+
 def full_scrape_user(
-    user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_temp_urls: bool, eager: bool
+    user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_html: bool, save_temp_urls: bool, eager: bool
 ):
 
     _logger.debug("Scraping user %s", user)
@@ -400,7 +425,7 @@ def full_scrape_user(
         json_directory = None
 
     base_url = f"https://www.instagram.com/{user}/"
-    html_save = f"{user}-front_page.html"
+    html_save = f"{user}-front_page.html" if save_html else None
     scraper = InstaScraper(
         base_url=base_url, wait_time=wait_time, base_dir=json_directory, html_save_location=html_save
     )
@@ -437,6 +462,8 @@ def main():
     parser.add_argument("--save-html", action=BooleanOptionalAction, default=True)
     parser.add_argument("--save-json", action=BooleanOptionalAction, default=True)
     parser.add_argument("--save-urls", action=BooleanOptionalAction, default=True)
+    parser.add_argument("--eager", action="store_true", dest="eager", default=True)
+    parser.add_argument("--lazy", action="store_false", dest="eager")
     args = parser.parse_args()
 
     users = args.users
@@ -444,14 +471,16 @@ def main():
     save_html = args.save_html
     save_json = args.save_json
     save_urls = args.save_urls
+    eager = args.eager
     for user in users:
         full_scrape_user(
             user,
             wait_time=wait_time,
             save_json=save_json,
+            save_html=save_html,
             save_temp_urls=save_urls,
             save_urls=save_urls,
-            eager=True,
+            eager=eager,
         )
 
 

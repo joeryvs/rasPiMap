@@ -116,3 +116,9 @@ class Factory(ABC):
     def keep_url(self, url: str) -> bool:
         """Predicate to determine if the"""
         return True
+
+    @abstractmethod
+    def load_urls_from_json_files(
+        self, *, html_location: str = "", json_directory: str = ""
+    ) -> collections.abc.Generator[str]:
+        """Load the urls from the JSON directory and the HTML, both could lead to nothing so the pressence should be checked"""
