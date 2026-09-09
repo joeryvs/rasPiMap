@@ -116,16 +116,18 @@ def fill_with_json_data(db: sqlite3.Connection, directory_path, /, dry_run, max_
         if image_data:
             _ = cur.execute(
                 "INSERT INTO image "
-                "(entityID,publishedDate,media,baseUri,prettyName,hasBlockReasons,shortUrl,Url,PageTitle,title)"
-                "VALUES (?,?,?,?,?,?,?,?,?,?) "
+                "(entityID,publishedDate,media,baseUri,prettyName,hasBlockReasons,shortUrl,Url,PageTitle,title) "
+                "VALUES (:entity_id,:publish_date,:media,:base_uri,:pretty_name,:has_block_reasons,:short_url,:url,:page_title,:title) "
                 "RETURNING entityId",
                 image_data,
             )
         _logger.debug("Inserted row: %s", cur.lastrowid)
-        _ = cur.executemany("INSERT INTO token (entityId,token) VALUES (?,?)", token_data)
+        _ = cur.executemany("INSERT INTO token (entityId,token) VALUES (:entity_id,:token)", token_data)
 
         _ = cur.executemany(
-            "INSERT INTO imageSize (entityId,width,height,type,component,filename,radius) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO imageSize (entityId,width,height,type,component,filename,radius)"
+            " VALUES "
+            "(:entity_id,:width,:height,:type,:component,:filename,:radius)",
             size_data,
         )
     if not dry_run:
@@ -183,18 +185,18 @@ def _create_image_size(id, x, pretty_name, base_uri):
     width = x["w"]
     height = x["h"]
     type = x["t"]
-    C: str = x.get("c", "")
+    C: str = x.get("c") or x.get("b") or x.get("s") or ""
     F: str = _get_file_name(C, pretty_name, base_uri)
     R = x["r"]
-    yield id, width, height, type, C, F, R
+    yield {"entity_id": id, "width": width, "height": height, "type": type, "component": C, "filename": F, "radius": R}
     if extra_sizes := x.get("ss", []):
         for x2 in extra_sizes:
             w2 = x2["w"]
             h2 = x2["h"]
             t2 = f"{type}-{x2['x']}x"
-            c2 = x2.get("c", "")
+            c2 = x2.get("c") or x2.get("b") or x2.get("s") or ""
             f2 = _get_file_name(c2, pretty_name, base_uri)
-            yield id, w2, h2, t2, c2, f2, R
+            yield {"entity_id": id, "width": w2, "height": h2, "type": t2, "component": c2, "filename": f2, "radius": R}
 
 
 def _extract_from_deviation_json(key, value):
@@ -210,8 +212,19 @@ def _extract_from_deviation_json(key, value):
     page_title = os.path.basename(url)
     title = value["title"]
     assert str(entityId) == str(key), f"{entityId} != {key}"
-    item1 = entityId, publishDate, media, baseUri, prettyName, hasBlockReasons, shortUrl, url, page_title, title
-    tokens = [(entityId, token) for token in (value["media"].get("token", []))]
+    item1 = {
+        "entity_id": entityId,
+        "publish_date": publishDate,
+        "media": media,
+        "base_uri": baseUri,
+        "pretty_name": prettyName,
+        "has_block_reasons": hasBlockReasons,
+        "short_url": shortUrl,
+        "url": url,
+        "page_title": page_title,
+        "title": title,
+    }
+    tokens = [{"entity_id": entityId, "token": token} for token in (value["media"].get("token", []))]
     sizes = [y for x in value["media"].get("types", []) for y in _create_image_size(entityId, x, prettyName, baseUri)]
     yield item1, tokens, sizes
 
@@ -231,7 +244,7 @@ def extract_items_from_json(obj):
                 prettyName = media["prettyName"]
                 baseUri = media["baseUri"]
                 # I know the tokens are wrong but we care about the link to the publishdate which makes it acceptable
-                tokens = [(entity_id, token) for token in (media.get("token", []))]
+                tokens = [{"entity_id": entity_id, "token": token} for token in (media.get("token", []))]
                 sizes = [
                     y for x in media.get("types", []) for y in _create_image_size(entity_id, x, prettyName, baseUri)
                 ]
