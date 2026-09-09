@@ -2,13 +2,12 @@ import datetime
 import logging
 import os
 
-import extract
 from download_utils import download_from_web
-from main import YtFactory, YtPostScraper
 from utils import print_iter_item, unique
+from youtube import YtFactory
 
 _logger = logging.getLogger(__name__)
-VERSION = "0.2"
+VERSION = "0.3"
 
 
 def full_scrape_user(
@@ -37,11 +36,11 @@ def full_scrape_user(
         json_directory = None
 
     # use the functionality in main.py to downlaod the URLS
+    scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
     if from_json and json_directory:
-        # TODO, replace with function inside factory
-        all_urls = extract.get_by_pattern(json_directory, "h")
+        # TODO, replace with function inside factory or scraper
+        all_urls = scraper.load_urls_from_files(json_directory=json_directory)
     else:
-        scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
         all_urls = scraper.run()
     if eager:
         all_urls = list(all_urls)

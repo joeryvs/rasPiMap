@@ -1,13 +1,14 @@
 import datetime
 import logging
 import os
+from collections.abc import Callable
 from sre_parse import parse
 
 from base import Factory, Scraper, State
 from download_utils import download_from_web
 from insta import InstagramFactory, InstaScraper, InstaState
-from main import YtFactory, YtPostScraper
 from utils import print_iter_item, unique
+from youtube import YtFactory, YtPostScraper
 
 _logger = logging.getLogger(__name__)
 VERSION = "0.1"
@@ -62,7 +63,7 @@ def full_scrape_user(
     download_from_web(urls, target_directory=directory_prefix, overwrite=True, update_extension=True)
 
 
-FACTORIES = {
+FACTORIES: dict[str, Callable[[str], Factory]] = {
     "instagram": InstagramFactory,
     "youtube": YtFactory,
 }

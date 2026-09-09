@@ -7,6 +7,7 @@ import logging
 import os
 from urllib import parse
 
+import extract
 import requests
 import utils
 from base import Factory, Scraper, State
@@ -255,6 +256,19 @@ class InstaState:
 #         return data_raw
 
 
+def _insta_urls_from_initial_page(soup):
+    scripts = soup.find_all("script")
+    target_script = _find_target_script(scripts)
+    if target_script is None:
+        _logger.warning("No script found")
+        return []
+
+    x = json.loads(target_script.text or "")
+    p = utils.find_keys_rec(x, "display_uri", with_path=True)
+
+    return [z for _, z in p]
+
+
 class InstaScraper(Scraper):
     def __init__(self, *, base_dir, wait_time, base_url, html_save_location: str | None = None) -> None:
         self.base_url = base_url
@@ -290,50 +304,9 @@ class InstaScraper(Scraper):
         with open(target, "r") as f:
             data = f.read()
         return data
-        # _headers = _get_headers(refererer="https://duckduckgo.com/")
-        # headers = {
-        #     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        #     "accept-language": "nl-NL,nl;q=0.9",
-        #     "cache-control": "no-cache",
-        #     "dpr": "1",
-        #     "pragma": "no-cache",
-        #     "priority": "u=0, i",
-        #     "referer": "https://duckduckgo.com/",
-        #     "sec-ch-prefers-color-scheme": "light",
-        #     "sec-ch-ua": '"Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"',
-        #     "sec-ch-ua-full-version-list": '"Chromium";v="152.0.7977.64", "Not?A_Brand";v="24.0.0.0", "Google Chrome";v="152.0.7977.64"',
-        #     "sec-ch-ua-mobile": "?0",
-        #     "sec-ch-ua-model": '""',
-        #     "sec-ch-ua-platform": '"Linux"',
-        #     "sec-ch-ua-platform-version": '""',
-        #     "sec-fetch-dest": "document",
-        #     "sec-fetch-mode": "navigate",
-        #     "sec-fetch-site": "same-origin",
-        #     "sec-fetch-user": "?1",
-        #     "upgrade-insecure-requests": "1",
-        #     "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
-        #     "viewport-width": "1914",
-        # }
-        # res = requests.get(url=self.base_url, timeout=30000, headers=headers, allow_redirects=True, verify=None)
-
-        # data = res.content.decode("utf-8")
-        # if self.html_save_location:
-        #     with open(self.html_save_location, "w") as f:
-        #         print(data, file=f)
-
-        # return data
 
     def urls_from_initial(self, soup) -> list:
-        scripts = soup.find_all("script")
-        target_script = _find_target_script(scripts)
-        if target_script is None:
-            _logger.warning("No script found")
-            return []
-
-        x = json.loads(target_script.text or "")
-        p = utils.find_keys_rec(x, "display_uri", with_path=True)
-
-        return [z for _, z in p]
+        return _insta_urls_from_initial_page(soup=soup)
 
     def urls_from_json(self, j) -> list:
         urls = utils.find_keys_rec(j, "display_uri", False)
@@ -386,7 +359,7 @@ class InstaScraper(Scraper):
 
 
 class InstagramFactory(Factory):
-    def __init__(self, *, user) -> None:
+    def __init__(self, user) -> None:
         self.user = user
         super().__init__()
         assert isinstance(self.user, str)
@@ -403,10 +376,10 @@ class InstagramFactory(Factory):
         )
 
     def post_process_url(self, url: str) -> str:
-        return super().post_process_url(url)
+        return url
 
     def keep_url(self, url: str) -> bool:
-        return super().keep_url(url)
+        return url.startswith("https")
 
 
 def full_scrape_user(

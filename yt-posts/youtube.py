@@ -1,11 +1,10 @@
-import argparse
 import dataclasses
-import datetime
 import json
 import logging
 import os
-from urllib.request import urlopen
+from collections.abc import Generator
 
+import extract
 import requests
 from base import Factory, Scraper, State
 from utils import find_key_rec, find_keys_rec_without_path
@@ -95,28 +94,16 @@ class YtState(State):
         }
 
 
-# class AbstractScraper(ABC):
-#     @abstractmethod
-#     def get_download_continuation_request(self, state: State) -> requests.Response:
-#         pass
-
-#     def download_continuation_json(self, state: State):
-
-#         with self.get_download_continuation_request(state=state) as res:
-#             data = res.json()
-#             if data is None:
-#                 _logger.warning("Decoding data, res options are %s", dir(res))
-#             return data
-
-
 class YtPostScraper(Scraper):
     def __init__(self, *, base_dir: str | None, graft_url: str, wait_time: float = 5.0) -> None:
         self.graft_url: str = graft_url
         super().__init__(base_dir=base_dir, wait_time=wait_time)
 
     def download_page(self) -> str:
-        with urlopen(self.graft_url, timeout=3000) as f:
-            data = f.read()
+
+        with requests.get(self.graft_url, timeout=3000) as f:
+            encoding = f.apparent_encoding or "utf-8"
+            data = f.content.decode(encoding=encoding)
 
         return data
 
@@ -136,7 +123,7 @@ class YtPostScraper(Scraper):
             return None
         value = str(scripts[0].text.removesuffix(";").removeprefix("var ytInitialData = "))
         json_obj = json.loads(value)
-        # Step 3 find and return the continuationCommand
+        # Step 3 find and return the first continuationCommand
         # command = json_obj
         command = find_key_rec(json_obj, "continuationCommand")
         if not isinstance(command, dict):
@@ -195,58 +182,13 @@ class YtPostScraper(Scraper):
             json=DATARAW,
         )
 
-    # # NEW METHODS
-    # def runloop(self, continuation: str, tracking_params: str):
-
-    #     state = YtState(continuation, tracking_params, self.graft_url)
-    #     index = 1
-    #     while 1:
-    #         _logger.info("Iteration: %s, currentState: %s", index, state)
-    #         json_obj = self.download_continuation(state)
-    #         yield json_obj
-    #         # save the JSON for later
-    #         if self.base_dir is not None:
-    #             out_path = os.path.join(self.base_dir, f"out_{index}.json")
-    #             with open(out_path, "w") as f_out:
-    #                 json.dump(fp=f_out, obj=json_obj, indent=2)
-
-    #         ans = find_key_rec(json_obj, "continuationCommand")
-    #         if ans is None:
-    #             break
-    #         p, c2 = ans
-    #         _logger.debug("Path to continuation command: %s", p)
-    #         _logger.debug("continuationCommand: %s", c2)
-    #         # Get new token and trackingParams and build a new State
-    #         c = c2.get("token")
-    #         t = json_obj.get("trackingParams")
-
-    #         assert c is not None
-    #         index += 1
-    #         state = YtState(c, t, self.graft_url)
-    #         time.sleep(self.wait_time)
-
-    # def run(self, eager: bool):
-    #     """Download page and start an iterative loop"""
-    #     html_data = self.download_page()
-    #     soup = BeautifulSoup(html_data, features="html.parser")
-    #     ans1 = self.retrieve_contiunationcommand_and_tracking_param_from_soup(soup=soup)
-    #     if not ans1:
-    #         _logger.error("No tokens found")
-    #         return "", []
-    #     c, t = ans1
-    #     jsons = self.runloop(c, t)
-    #     if eager:
-    #         # if not lazy, listify the JSON element
-    #         jsons = list(jsons)
-    #     return html_data, jsons
-
 
 class YtFactory(Factory):
     def __init__(self, user: str) -> None:
         assert isinstance(user, str)
         self.user = user.strip().removeprefix("@")
         assert user
-        assert all(char.isprintable() for char in user)
+        assert user.isprintable()
         # TODO proper check, alpha-numeric characters or . or _ or - and some others
         super().__init__()
 
@@ -271,27 +213,3 @@ class YtFactory(Factory):
 
     def keep_url(self, url: str) -> bool:
         return url.startswith("https://yt3.ggpht.com")
-
-
-def main():
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-P", "--directory-prefix", type=str)
-    parser.add_argument("--wait-times", type=float, default=5)
-
-    parser.add_argument("user")
-
-    args = parser.parse_args()
-
-    graft_url = f"https://www.youtube.com/@{args.user.strip().removeprefix('@')}/posts"
-    directory_prefix = args.directory_prefix
-    if not args.directory_prefix:
-        directory_prefix = datetime.datetime.now().strftime("{}-%Y-%j").format(args.user)
-
-    os.makedirs(directory_prefix, exist_ok=True)
-    scraper = YtPostScraper(directory_prefix, graft_url, wait_time=args.wait_times)
-    scraper.run(eager=True)
-
-
-if __name__ == "__main__":
-    main()

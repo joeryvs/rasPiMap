@@ -79,6 +79,19 @@ class Scraper(ABC):
             time.sleep(self.wait_time)
             index += 1
 
+    def load_urls_from_files(self, /, html_location="", json_directory=""):
+        if os.path.isfile(html_location):
+            with open(html_location, "r") as file:
+                soup = BeautifulSoup(file.read())
+                yield from self.urls_from_initial(soup=soup)
+        if os.path.isdir(json_directory):
+            for file in os.listdir(json_directory):
+                file = os.path.join(json_directory, file)
+                with open(file, "r") as fp:
+                    json_obj = json.load(fp=fp)
+                    urls = self.urls_from_json(json_obj)
+                    yield from urls
+
 
 class EagerScraper(Scraper):
     def __init__(self, *, scraper: Scraper) -> None:
@@ -114,11 +127,5 @@ class Factory(ABC):
         return url
 
     def keep_url(self, url: str) -> bool:
-        """Predicate to determine if the"""
+        """Predicate to determine if the url should be kept"""
         return True
-
-    @abstractmethod
-    def load_urls_from_json_files(
-        self, *, html_location: str = "", json_directory: str = ""
-    ) -> collections.abc.Generator[str]:
-        """Load the urls from the JSON directory and the HTML, both could lead to nothing so the pressence should be checked"""
