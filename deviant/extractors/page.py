@@ -1,13 +1,15 @@
-
-from abc import ABC, abstractmethod
 import logging
 import re
+from abc import ABC, abstractmethod
 
 from utils import Extractor
 
 _logger = logging.getLogger(__name__)
 
+
 class PageExtractor(Extractor, ABC):
+    _name = None
+
     def extract(self, /, input_path, sort=True, unique=True, **kwargs):
         art_links = self.retrieve(input_path)
         # remove duplicates
@@ -40,19 +42,27 @@ class PageExtractor(Extractor, ABC):
 
 
 class TagPageExtractor(PageExtractor):
+    _name = "tags"
+
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/tag/.*$")
 
+
 class AllPagesExtractor(PageExtractor):
+    _name = "all_links"
+
     def extract_regex(self) -> re.Pattern:
         return re.compile(".*")
 
 
 class UserPageExtractor(PageExtractor):
+    _name = "users"
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/gallery.*$")
 
+
 class ArtPageExtractor(PageExtractor):
+    _name = "art"
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/art/.+$")
 

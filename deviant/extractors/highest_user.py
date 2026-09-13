@@ -7,6 +7,8 @@ _logger = logging.getLogger(__name__)
 
 
 class HighestUserExtractor(UserPageExtractor):
+    _name = "highest_user_page_number"
+
     def extract(self, /, input_path, **kwargs):
 
         art_links = self.retrieve(input_path=input_path)

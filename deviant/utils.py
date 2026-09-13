@@ -96,6 +96,8 @@ class IOWriter(Writer):
 
 
 class Extractor(ABC):
+    _name: str | None = None
+
     def __init__(self, reader: Reader, writer: Writer):
         self.reader = reader
         self.writer = writer

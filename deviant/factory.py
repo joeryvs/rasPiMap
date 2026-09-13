@@ -46,20 +46,20 @@ class ExtractorFactory:
             "image": ImageExtractor,
             "default_image": DefaultImageExtractor,
             "largest_image": LargestImageExtractor,
-            "deviantart_images": DeviantArtImageExtractor,
-            "deviantart_images2x": DeviantArtImage2XExtractor,
-            "deviantart_large_images": DeviantArtLargeImageExtractor,
+            "deviantart.image": DeviantArtImageExtractor,
+            "deviantart.image2x": DeviantArtImage2XExtractor,
+            "deviantart.large_image": DeviantArtLargeImageExtractor,
             "no_crop": NoCropImageExtractor,
             "no_crop_large": NoCropImageExtractorLarge,
-            "deviant_art_all_images": DeviantArtAllImagesExtractor,
-            "main_image": MainImageExtractor,
-            "avatar": AvatarExtractor,
+            "deviantart.all_images": DeviantArtAllImagesExtractor,
+            "deviantart.main_image": MainImageExtractor,
+            "deviantart.avatar": AvatarExtractor,
             "users": UserPageExtractor,
             "highest_user_page_number": HighestUserExtractor,
             "all_links": AllPagesExtractor,
             "tags": TagPageExtractor,
-            "description": DescriptionExtractor,
-            "story": StoryExtractor,
+            "deviantart.description": DescriptionExtractor,
+            "deviantart.story": StoryExtractor,
             "json": JsonExtractor,
             "json_art": JsonImageUrlExtractor,
             "deviantart.additionalmedia": JsonAdditionalMediaExtractor,
@@ -73,6 +73,10 @@ class ExtractorFactory:
             "video": VideoExtractor,
             "link": LinkExtractor,
         }
+
+        # test the keys.
+        for k, v in self._options.items():
+            assert k == v._name, "%s is not %s in %s" % (k, v._name, v.__name__)
 
     @property
     def choices(self):

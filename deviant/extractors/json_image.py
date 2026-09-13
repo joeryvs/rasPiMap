@@ -7,6 +7,8 @@ _logger = logging.getLogger(__name__)
 
 
 class JsonImageUrlExtractor(Extractor):
+    _name = "json_art"
+
     def extract(self, /, input_path, **kwargs):
         all_urls = self.retrieve(input_path=input_path)
         all_urls = sorted(dict.fromkeys(all_urls))
@@ -87,17 +89,23 @@ class JsonImageUrlExtractor(Extractor):
 
 
 class JsonImagePreUrlExtractor(JsonImageUrlExtractor):
+    _name = "json_art_pre"
+
     def _image_size_order(self) -> list[str]:
         # preview is the one that is guaranteed to be not to large
         return ["preview"]
 
 
 class JsonImagePreUrlNoBlurExtractor(JsonImagePreUrlExtractor):
+    _name = "deviantart.json.pre.noblur"
+
     def retrieve(self, input_path):
         return filter(lambda url: "blur" not in url, super().retrieve(input_path))
 
 
 class JsonImagePermutationExtractor(JsonImageUrlExtractor):
+    _name = "json_perm"
+
     def construct_urls_from_media(self, media):
         baseUri: str = media.get("baseUri", "")
         prettyName: str = media.get("prettyName", "")
@@ -138,6 +146,8 @@ class JsonImagePermutationExtractor(JsonImageUrlExtractor):
 
 
 class JsonAdditionalMediaExtractor(JsonImageUrlExtractor):
+    _name = "deviantart.additionalmedia"
+
     def retrieve(self, input_path):
         a = self.find_elements(input_path, "script", id="_R_")
         for script_tag in a:
@@ -151,6 +161,8 @@ class JsonAdditionalMediaExtractor(JsonImageUrlExtractor):
 
 
 class JsonVideoAllExtractor(JsonImageUrlExtractor):
+    _name = "json_video"
+
     def construct_urls_from_media(self, media):
         types: list[dict] = media.get("types")
         videos = [t for t in types if t["t"] == "video"]
@@ -158,6 +170,8 @@ class JsonVideoAllExtractor(JsonImageUrlExtractor):
 
 
 class JsonVideoBestExtractor(JsonImageUrlExtractor):
+    _name = "json_video_best"
+
     def construct_urls_from_media(self, media):
         types: list[dict] = media.get("types")
         videos = [t for t in types if t["t"] == "video"]
@@ -168,6 +182,8 @@ class JsonVideoBestExtractor(JsonImageUrlExtractor):
 
 
 class JsonPdfExtractor(JsonImageUrlExtractor):
+    _name = "json_pdf"
+
     def construct_urls_from_media(self, media) -> list[str]:
         types: list[dict] = media.get("types")
         videos = [t for t in types if t["t"] == "pdf"]
@@ -175,6 +191,8 @@ class JsonPdfExtractor(JsonImageUrlExtractor):
 
 
 class JsonLiteratureUrl(JsonImageUrlExtractor):
+    _name = "json_literature_url"
+
     def retrieve(self, input_path):
         from urllib import parse
 

@@ -6,11 +6,14 @@ _logger = logging.getLogger(__name__)
 
 
 class NoCropImageExtractor(DeviantArtImageExtractor):
+    _name = "no_crop"
+
     def _keep_string(self, regex, string):
         return super()._keep_string(regex, string) and "/crop/" not in string
 
 
 class NoCropImageExtractorLarge(NoCropImageExtractor):
+    _name = "no_crop_large"
     _include_srcset = True
 
     def retrieve_img_src(self, anchor):

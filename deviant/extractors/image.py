@@ -9,6 +9,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ImageExtractor(Extractor):
+    _name = "image"
     _include_srcset = True
 
     def extract(self, /, input_path, sort=True, unique=True, **kwargs):
@@ -57,10 +58,12 @@ class ImageExtractor(Extractor):
 
 
 class DefaultImageExtractor(ImageExtractor):
+    _name = "default_image"
     _include_srcset = False
 
 
 class LargestImageExtractor(ImageExtractor):
+    _name = "largest_image"
     _include_srcset = True
 
     def retrieve_img_src(self, anchor):

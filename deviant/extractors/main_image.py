@@ -2,6 +2,7 @@ from .image import ImageExtractor
 
 
 class MainImageExtractor(ImageExtractor):
+    _name = "deviantart.main_image"
     _include_srcset = False
 
     def _find_elements_kwargs(self):

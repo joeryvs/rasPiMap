@@ -7,6 +7,7 @@ _logger = logging.getLogger(__name__)
 
 
 class DescriptionExtractor(OnePerPageExtractor):
+    _name = "deviantart.description"
     def handle_page(self, name, soup):
         section = soup.find("div", id="description")
 
@@ -21,6 +22,7 @@ class DescriptionExtractor(OnePerPageExtractor):
         return super().retrieve(input_path)
 
 class StoryExtractor(OnePerPageExtractor):
+    _name = "deviantart.story"
     def handle_page(self, name, soup):
 
         section = soup.find("section", class_="HiQtsh")

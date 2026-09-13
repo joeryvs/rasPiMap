@@ -12,7 +12,9 @@ _logger = logging.getLogger(__name__)
 
 
 class JsonExtractor(Extractor):
-    def extract(self,/, input_path,  **kwargs):
+    _name = "json"
+
+    def extract(self, /, input_path, **kwargs):
         if not isinstance(input_path, list):
             input_path = [input_path]
         input_path = [

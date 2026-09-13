@@ -8,6 +8,8 @@ _logger = logging.getLogger(__name__)
 
 
 class LinkExtractor(Extractor):
+    _name = "link"
+
     def extract(self, /, input_path, sort=True, unique=True, **kwargs):
         art_links = self.retrieve(input_path)
         art_link_paths = art_links
@@ -18,7 +20,6 @@ class LinkExtractor(Extractor):
             _logger.info("Sorting items")
             art_link_paths = list(art_link_paths)
             art_link_paths.sort()
-        _logger.info("art_links are: ")
 
         self.writer.output_items(art_link_paths)
 
@@ -45,5 +46,7 @@ class LinkExtractor(Extractor):
 
 
 class VideoExtractor(LinkExtractor):
+    _name = "video"
+
     def _find_elements_kwargs(self):
         return {"as": "video"}
