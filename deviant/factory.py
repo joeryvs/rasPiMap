@@ -1,39 +1,6 @@
-#!../venv/bin/python
 import logging
 
-from extractors import (
-    AllPagesExtractor,
-    ArtPageExtractor,
-    AvatarExtractor,
-    DefaultImageExtractor,
-    DescriptionExtractor,
-    DeviantArtAllImagesExtractor,
-    DeviantArtImage2XExtractor,
-    DeviantArtImageExtractor,
-    DeviantArtLargeImageExtractor,
-    HighestUserExtractor,
-    ImageExtractor,
-    JsonAdditionalMediaExtractor,
-    JsonExtractor,
-    JsonImagePermutationExtractor,
-    JsonImagePreUrlExtractor,
-    JsonImagePreUrlNoBlurExtractor,
-    JsonImageUrlExtractor,
-    JsonLiteratureUrl,
-    JsonPdfExtractor,
-    JsonVideoAllExtractor,
-    JsonVideoBestExtractor,
-    LargestImageExtractor,
-    LinkExtractor,
-    MainImageExtractor,
-    NoCropImageExtractor,
-    NoCropImageExtractorLarge,
-    PageExtractor,
-    StoryExtractor,
-    TagPageExtractor,
-    UserPageExtractor,
-    VideoExtractor,
-)
+import extractors
 from utils import Extractor
 
 _logger = logging.getLogger(__name__)
@@ -41,38 +8,15 @@ _logger = logging.getLogger(__name__)
 
 class ExtractorFactory:
     def __init__(self):
-        self._options = {
-            "art": ArtPageExtractor,
-            "image": ImageExtractor,
-            "default_image": DefaultImageExtractor,
-            "largest_image": LargestImageExtractor,
-            "deviantart.image": DeviantArtImageExtractor,
-            "deviantart.image2x": DeviantArtImage2XExtractor,
-            "deviantart.large_image": DeviantArtLargeImageExtractor,
-            "no_crop": NoCropImageExtractor,
-            "no_crop_large": NoCropImageExtractorLarge,
-            "deviantart.all_images": DeviantArtAllImagesExtractor,
-            "deviantart.main_image": MainImageExtractor,
-            "deviantart.avatar": AvatarExtractor,
-            "users": UserPageExtractor,
-            "highest_user_page_number": HighestUserExtractor,
-            "all_links": AllPagesExtractor,
-            "tags": TagPageExtractor,
-            "deviantart.description": DescriptionExtractor,
-            "deviantart.story": StoryExtractor,
-            "json": JsonExtractor,
-            "json_art": JsonImageUrlExtractor,
-            "deviantart.additionalmedia": JsonAdditionalMediaExtractor,
-            "json_perm": JsonImagePermutationExtractor,
-            "json_video": JsonVideoAllExtractor,
-            "json_video_best": JsonVideoBestExtractor,
-            "json_pdf": JsonPdfExtractor,
-            "json_literature_url": JsonLiteratureUrl,
-            "json_art_pre": JsonImagePreUrlExtractor,
-            "deviantart.json.pre.noblur": JsonImagePreUrlNoBlurExtractor,
-            "video": VideoExtractor,
-            "link": LinkExtractor,
-        }
+
+        # Build a dictionary of options from the extractors module
+        self._options = {}
+        for a in extractors.__all__:
+            extractor = getattr(extractors, a)
+            if name := getattr(extractor, "_name", None):
+                if name in self._options:
+                    raise ValueError(f"name {name} is double defined")
+                self._options[name] = extractor
 
         # test the keys.
         for k, v in self._options.items():
