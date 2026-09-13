@@ -19,7 +19,8 @@ class TestImageExtractor(unittest.TestCase):
         self.writer = None
 
     def test_regex_matches(self):
-
+        self.reader = utils.Reader()
+        self.writer = utils.FileWriter("test.txt")
         self.extractor = ImageExtractor(self.reader, self.writer)
         regex = self.extractor._regex()
         match_urls = [
@@ -53,6 +54,8 @@ class TestImageExtractor(unittest.TestCase):
 
         html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3.png 4x'/>"""
         anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.reader = utils.Reader()
+        self.writer = utils.FileWriter("test.txt")
         self.extractor = ImageExtractor(self.reader, self.writer)
 
         sources = list(self.extractor.retrieve_img_src(anchor))
@@ -69,6 +72,8 @@ class TestImageExtractor(unittest.TestCase):
     def test_retrieve_img_src_when_url_contains_comma(self):
         html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3,5.png 4x'/>"""
         anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.reader = utils.Reader()
+        self.writer = utils.FileWriter("test.txt")
         self.extractor = ImageExtractor(self.reader, self.writer)
 
         sources = list(self.extractor.retrieve_img_src(anchor))
@@ -85,7 +90,8 @@ class TestImageExtractor(unittest.TestCase):
 
 class TestAvatarExtractor(unittest.TestCase):
     def test_regex_matches(self):
-
+        self.reader = utils.Reader()
+        self.writer = utils.FileWriter("test.txt")
         self.extractor = AvatarExtractor(self.reader, self.writer)
         regex = self.extractor._regex()
         self.assertNotRegex("https://www.example.com/test1/level2/more", regex)
@@ -103,6 +109,8 @@ class TestMainImageExtractor(unittest.TestCase):
 
         html = """<img alt='test' src='https://1.png' srcset='https://2.png 2x, https://3.png 4x'/>"""
         anchor = BeautifulSoup(html, "html.parser").find("img")
+        self.reader = utils.Reader()
+        self.writer = utils.FileWriter("test.txt")
         self.extractor = MainImageExtractor(self.reader, self.writer)
 
         self.assertFalse(self.extractor._include_srcset)
@@ -122,18 +130,19 @@ class TestExtractorFactory(unittest.TestCase):
 
     def test_contains_keys(self):
 
-        self.assertIn("images", self.factory.choices)
-        self.assertIn("images2x", self.factory.choices)
+        self.assertIn("deviantart_images", self.factory.choices)
+        self.assertIn("deviantart_images2x", self.factory.choices)
         self.assertIn("art", self.factory.choices)
         self.assertIn("users", self.factory.choices)
-        self.assertIn("all_images", self.factory.choices)
-        self.assertIn("large_images", self.factory.choices)
+        self.assertIn("image", self.factory.choices)
+        self.assertIn("deviantart_large_images", self.factory.choices)
         self.assertIn("no_crop", self.factory.choices)
         self.assertIn("description", self.factory.choices)
 
     def test_extractor_is_build(self):
-
-        imageExt = self.factory.extractor("images")
+        self.reader = utils.Reader()
+        self.writer = utils.FileWriter("test.txt")
+        imageExt = self.factory.extractor("deviantart_images", self.reader, self.writer)
         self.assertIsInstance(imageExt, utils.Extractor)
 
     def test_invalid_key_gives_error(self):

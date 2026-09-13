@@ -17,6 +17,7 @@ from extractors import (
     JsonExtractor,
     JsonImagePermutationExtractor,
     JsonImagePreUrlExtractor,
+    JsonImagePreUrlNoBlurExtractor,
     JsonImageUrlExtractor,
     JsonLiteratureUrl,
     JsonPdfExtractor,
@@ -68,6 +69,7 @@ class ExtractorFactory:
             "json_pdf": JsonPdfExtractor,
             "json_literature_url": JsonLiteratureUrl,
             "json_art_pre": JsonImagePreUrlExtractor,
+            "deviantart.json.pre.noblur": JsonImagePreUrlNoBlurExtractor,
             "video": VideoExtractor,
             "link": LinkExtractor,
         }

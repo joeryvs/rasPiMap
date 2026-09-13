@@ -92,6 +92,11 @@ class JsonImagePreUrlExtractor(JsonImageUrlExtractor):
         return ["preview"]
 
 
+class JsonImagePreUrlNoBlurExtractor(JsonImagePreUrlExtractor):
+    def retrieve(self, input_path):
+        return filter(lambda url: "blur" not in url, super().retrieve(input_path))
+
+
 class JsonImagePermutationExtractor(JsonImageUrlExtractor):
     def construct_urls_from_media(self, media):
         baseUri: str = media.get("baseUri", "")
@@ -171,6 +176,8 @@ class JsonPdfExtractor(JsonImageUrlExtractor):
 
 class JsonLiteratureUrl(JsonImageUrlExtractor):
     def retrieve(self, input_path):
+        from urllib import parse
+
         a = self.find_elements(input_path, "script", id="_R_")
         for script_tag in a:
             json_obj = self.script_tag_to_json(script_tag)
@@ -180,4 +187,4 @@ class JsonLiteratureUrl(JsonImageUrlExtractor):
                 for v in deviation_dict.values():
                     if v["type"] == "literature":
                         url = v["url"]
-                        yield url
+                        yield parse.unquote(url)

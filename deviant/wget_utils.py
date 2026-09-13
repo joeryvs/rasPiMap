@@ -44,18 +44,13 @@ def pause_execution(seconds, random_wait: bool = False):
     return time.sleep(seconds)
 
 
-def _to_unicode(filename: str) -> str:
-    """:return: filename decoded from utf-8 to unicode"""
-    return filename
-
-
 def _filename_from_url(url: str) -> str | None:
-    """:return: detected filename as unicode or None"""
+    """:return: detected filename as str or None"""
     # [ ] test urlparse behavior with unicode url
     fname = os.path.basename(urlparse.urlparse(url).path)
     if len(fname.strip(" \n\t.")) == 0:
         return None
-    return _to_unicode(fname)
+    return fname
 
 
 def _filename_from_headers(headers: dict | list | str) -> str | None:
@@ -99,12 +94,13 @@ def _filename_fix_existing(filename: str) -> str:
     suffixes = [x.replace(name, "", 1) for x in names]
     # filter suffixes that match ' (x)' pattern
     suffixes = [x[2:-1] for x in suffixes if x.startswith(" (") and x.endswith(")")]
-    indexes = [int(x) for x in suffixes if set(x) <= set("0123456789")]
+    indexes = [int(x) for x in suffixes if x.isnumeric()]
     idx = max(indexes) + 1 if indexes else 1
     if ext:
-        return "%s (%d).%s" % (name, idx, ext)
+        new_basename = "%s (%d).%s" % (name, idx, ext)
     else:
-        return "%s (%d)" % (name, idx)
+        new_basename = "%s (%d)" % (name, idx)
+    return os.path.join(dirname, new_basename)
 
 
 # --- terminal/console output helpers ---

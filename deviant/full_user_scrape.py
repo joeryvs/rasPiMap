@@ -20,7 +20,7 @@ VERSION = "1.0"
 _logger = logging.getLogger(__name__)
 
 
-def wget_download(input_file: str, directory_prefix: str, wait_time: float, check: bool = True):
+def wget_download(input_file: str, directory_prefix: str, wait_time: float):
     # Download the image with wget_utils function
     wget_utils.download_from_file(input_file, directory_prefix, wait_time=wait_time, random_wait=True)
 
@@ -53,9 +53,14 @@ def run(
 
     reader = Reader()
     gal_pages = f"gallery-pages/{user}/"
+    art_pages_link_file = f"{user}_art.txt"
     if not skip_gallery_download:
         # Download gallary
         gal_scrape.run_single_user(user=user, wait=wait_pages)
+        # extract art pages links already
+        ArtPageExtractor(reader=reader, writer=FileWriter(art_pages_link_file)).extract(
+            gal_pages, sort=True, unique=True
+        )
     if images_from_gallery:
         json_pre_image = f"{user}_json_pre_image.txt"
         if not os.path.isfile(json_pre_image):
@@ -80,12 +85,13 @@ def run(
                     update_file_times(db, p, dry_run=False)
         return
 
-    art_pages_link_file = f"{user}_art.txt"
     art_pages = f"Art-Pages/{user}_art/"
     if not skip_pages_download:
-        ArtPageExtractor(reader=reader, writer=FileWriter(art_pages_link_file)).extract(
-            gal_pages, sort=True, unique=True
-        )
+        # if art pages links does not exist, create. otherwise run prefiltered
+        if not os.path.isfile(art_pages_link_file):
+            ArtPageExtractor(reader=reader, writer=FileWriter(art_pages_link_file)).extract(
+                gal_pages, sort=True, unique=True
+            )
 
         wget_download(input_file=art_pages_link_file, directory_prefix=art_pages, wait_time=wait_pages)
     dir_desc = f"{user}_desc"
