@@ -130,19 +130,19 @@ class TestExtractorFactory(unittest.TestCase):
 
     def test_contains_keys(self):
 
-        self.assertIn("deviantart_images", self.factory.choices)
-        self.assertIn("deviantart_images2x", self.factory.choices)
+        self.assertIn("deviantart.image", self.factory.choices)
+        self.assertIn("deviantart.image2x", self.factory.choices)
         self.assertIn("art", self.factory.choices)
         self.assertIn("users", self.factory.choices)
         self.assertIn("image", self.factory.choices)
-        self.assertIn("deviantart_large_images", self.factory.choices)
+        self.assertIn("deviantart.large_image", self.factory.choices)
         self.assertIn("no_crop", self.factory.choices)
-        self.assertIn("description", self.factory.choices)
+        self.assertIn("deviantart.description", self.factory.choices)
 
     def test_extractor_is_build(self):
         self.reader = utils.Reader()
         self.writer = utils.FileWriter("test.txt")
-        imageExt = self.factory.extractor("deviantart_images", self.reader, self.writer)
+        imageExt = self.factory.extractor("deviantart.image", self.reader, self.writer)
         self.assertIsInstance(imageExt, utils.Extractor)
 
     def test_invalid_key_gives_error(self):

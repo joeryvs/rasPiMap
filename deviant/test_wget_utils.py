@@ -26,7 +26,7 @@ class TestWget(TestCase):
 
         result = parse_last_modified_header(a)
 
-        self.assertEqual(result, datetime(2025, 10, 12, 1, 19, 25, tzinfo=timezone.utc))
+        self.assertEqual(result, datetime(2025, 10, 12, 1, 19, 25))
 
     def test_parse_last_modified_header_02(self):
 
@@ -34,14 +34,15 @@ class TestWget(TestCase):
 
         result = parse_last_modified_header(a)
 
-        self.assertEqual(result, datetime(2000, 1, 31, 23, 41, 59, tzinfo=timezone.utc))
+        self.assertEqual(result, datetime(2000, 1, 31, 23, 41, 59, tzinfo=None))
 
     def test_parse_last_modified_header_invalid(self):
         invalid = ["", "12 Oct 2025 ", "01022000T010101"]
 
         for invalid_item in invalid:
-            with self.subTest(invalid_item=repr(invalid_item)):
+            with self.subTest(invalid_item=repr(invalid_item)), mock.patch("wget_utils._logger") as mock_logger:
                 result = parse_last_modified_header(invalid_item)
+                mock_logger.error.assert_called_once()
                 self.assertIsNone(result)
 
     def test_filename_fix_existing_no_others(self):

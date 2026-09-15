@@ -243,18 +243,18 @@ def parse_last_modified_header(last_modified_date: str) -> datetime.datetime | N
         # Source - https://stackoverflow.com/a/1472008
         # Posted by SilentGhost
         # Retrieved 2026-09-04, License - CC BY-SA 2.5
-        write_date = datetime.datetime.strptime(last_modified_date, "%a, %d %b %Y %H:%M:%S GMT").replace(
-            tzinfo=datetime.timezone.utc
-        )
+        write_date = datetime.datetime.strptime(last_modified_date, "%a, %d %b %Y %H:%M:%S %Z")
         return write_date
     except ValueError:
         _logger.error("Error parsing date of %s is not valid date", last_modified_date)
+        return None
         try:
             write_date = datetime.datetime.strptime(last_modified_date, "%a, %d %b %Y %H:%M:%S UTC").replace(
                 tzinfo=datetime.timezone.utc
             )
             return write_date
         except ValueError:
+            _logger.error("Error parsing date of %s is not valid date", last_modified_date)
             return None
 
 
