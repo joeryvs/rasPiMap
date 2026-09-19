@@ -18,6 +18,18 @@ extensions = {
 }
 
 
+def _find_file_name(url: str | bytes, default="no_file") -> str:
+    path = urllib.parse.urlsplit(url=url).path
+    if isinstance(path, bytes):
+        path = path.decode()
+    parts = path.split("/")
+    return next(iter(filter(None, reversed(parts))), default)
+    final_name = parts[-1]
+    if not final_name and len(parts) > 1:
+        return parts[-2]
+    return final_name
+
+
 def download_from_web(
     urls: collections.abc.Iterable[str],
     /,
@@ -31,7 +43,7 @@ def download_from_web(
 
     for i, url in enumerate(urls, start=1):
         # From the url perform an urlsplit to remove the query parameters, and finally split at / and take the last element
-        p = urllib.parse.urlsplit(url=url).path.split("/")[-1]
+        p = _find_file_name(url=url)
         time.sleep(0.1)
         with requests.get(url=url) as res:
             new_file = pathlib.Path(os.path.join(target_directory, p))

@@ -2,9 +2,8 @@ import datetime
 import logging
 import os
 from collections.abc import Callable
-from sre_parse import parse
 
-from base import Factory, Scraper, State
+from base import Factory
 from download_utils import download_from_web
 from insta import InstagramFactory, InstaScraper, InstaState
 from utils import print_iter_item, unique
@@ -40,11 +39,12 @@ def full_scrape_user(
     else:
         json_directory = None
 
+    scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
     # use the functionality in main.py to downlaod the URLS
     if from_json and json_directory:
-        all_urls = factory.load_urls_from_json_files(json_directory=json_directory, html_location="")
+        all_urls = scraper.load_urls_from_files(json_directory=json_directory, html_location="")
     else:
-        scraper = factory.get_scraper(base_dir=json_directory, wait_time=wait_time)
+
         all_urls = scraper.run()
     if eager:
         all_urls = list(all_urls)

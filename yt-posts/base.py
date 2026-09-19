@@ -10,13 +10,7 @@ from bs4 import BeautifulSoup
 _logger = logging.getLogger(__name__)
 
 
-class State(ABC):
-    @abstractmethod
-    def get_data_raw(self) -> str | dict:
-        pass
-
-
-class Scraper(ABC):
+class Scraper[State](ABC):
     def __init__(self, *, base_dir: str | None, wait_time=4.0) -> None:
         self.base_dir = base_dir
         self.wait_time = wait_time

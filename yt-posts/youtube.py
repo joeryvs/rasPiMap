@@ -1,19 +1,17 @@
 import dataclasses
 import json
 import logging
-import os
-from collections.abc import Generator
 
 import extract
 import requests
-from base import Factory, Scraper, State
+from base import Factory, Scraper
 from utils import find_key_rec, find_keys_rec_without_path
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)
-class YtState(State):
+class YtState:
     continuationToken: str
     trackingParams: str
     graft_url: str
@@ -94,7 +92,7 @@ class YtState(State):
         }
 
 
-class YtPostScraper(Scraper):
+class YtPostScraper[Y: YtState](Scraper):
     def __init__(self, *, base_dir: str | None, graft_url: str, wait_time: float = 5.0) -> None:
         self.graft_url: str = graft_url
         super().__init__(base_dir=base_dir, wait_time=wait_time)
@@ -107,7 +105,7 @@ class YtPostScraper(Scraper):
 
         return data
 
-    def find_initial_state(self, soup) -> State | None:
+    def find_initial_state(self, soup) -> YtState | None:
         # step 1, download the PAGE, And get it into RAM
         # Step 2, extract the correct script definition
         scripts = soup.find_all("script")
@@ -144,7 +142,7 @@ class YtPostScraper(Scraper):
                 _logger.warning("Decoding data, res options are %s", dir(res))
             return data
 
-    def find_next_state(self, json_obj, prev_state) -> State | None:
+    def find_next_state(self, json_obj, prev_state) -> YtState | None:
 
         ans = find_key_rec(json_obj, "continuationCommand")
         c2 = ans
@@ -168,7 +166,7 @@ class YtPostScraper(Scraper):
         answer = find_keys_rec_without_path(j, "url")
         return answer
 
-    def get_download_continuation_request(self, state: State) -> requests.Response:
+    def get_download_continuation_request(self, state: YtState) -> requests.Response:
         DATARAW = state.get_data_raw()
         return requests.post(
             url="https://www.youtube.com/youtubei/v1/browse",

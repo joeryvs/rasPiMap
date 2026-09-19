@@ -1,5 +1,3 @@
-import collections
-import collections.abc
 import dataclasses
 import datetime
 import json
@@ -10,7 +8,7 @@ from urllib import parse
 import extract
 import requests
 import utils
-from base import Factory, Scraper, State
+from base import Factory, Scraper
 from download_utils import download_from_web
 from utils import print_iter_item, unique
 
@@ -19,33 +17,30 @@ VERSION = "0.1"
 
 
 def download_insta_page(url, target):
-    headers = [
-        "accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-language: nl-NL,nl;q=0.9",
-        "cache-control: no-cache",
-        "dpr: 1",
-        "pragma: no-cache",
-        "priority: u=0, i",
-        "referer: https://duckduckgo.com/",
-        "sec-ch-prefers-color-scheme: light",
-        'sec-ch-ua: "Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"',
-        'sec-ch-ua-full-version-list: "Chromium";v="152.0.7977.64", "Not?A_Brand";v="24.0.0.0", "Google Chrome";v="152.0.7977.64"',
-        "sec-ch-ua-mobile: ?0",
-        'sec-ch-ua-model: ""',
-        'sec-ch-ua-platform: "Linux"',
-        'sec-ch-ua-platform-version: ""',
-        "sec-fetch-dest: document",
-        "sec-fetch-mode: navigate",
-        "sec-fetch-site: same-origin",
-        "sec-fetch-user: ?1",
-        "upgrade-insecure-requests: 1",
-        "user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
-        "viewport-width: 1914",
-    ]
-    # headers = dict([tuple(h.decode("utf-8").rsplit(": ", 1)) for h in headers])
-    x = [tuple(y) for y in [tuple(h.split(": ", 1)) for h in headers] if len(y) == 2]
-    headers = dict(x)  # pylint: ignore
 
+    headers = {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language": "nl-NL,nl;q=0.9",
+        "cache-control": "no-cache",
+        "dpr": "1",
+        "pragma": "no-cache",
+        "priority": "u=0, i",
+        "referer": "https://duckduckgo.com/",
+        "sec-ch-prefers-color-scheme": "light",
+        "sec-ch-ua": '"Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"',
+        "sec-ch-ua-full-version-list": '"Chromium";v="152.0.7977.64", "Not?A_Brand";v="24.0.0.0", "Google Chrome";v="152.0.7977.64"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-model": '""',
+        "sec-ch-ua-platform": '"Linux"',
+        "sec-ch-ua-platform-version": '""',
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "viewport-width": "1914",
+    }
     res = requests.get(
         url=url,
         timeout=30000,
@@ -66,29 +61,6 @@ def download_insta_page(url, target):
     data = res.content.decode("utf-8")
     with open(target, "w") as f:
         print(data, file=f)
-    # curl --url  \
-    #   -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
-    #   -H 'accept-language: nl-NL,nl;q=0.9' \
-    #   -H 'cache-control: no-cache' \
-    #   -b 'csrftoken=knYXW4LbCkbA8xh3I6bj-D; datr=lSmDagjmqHEkJ2sAPpRNlC_N; ig_did=8B4D78DB-6FDC-4EF1-B49D-D6C255C6E7D4; mid=aoMplQAEAAFj9CdbeQW4NI0tmEZg; wd=1914x960' \
-    #   -H 'dpr: 1' \
-    #   -H 'pragma: no-cache' \
-    #   -H 'priority: u=0, i' \
-    #   -H 'referer: https://duckduckgo.com/' \
-    #   -H 'sec-ch-prefers-color-scheme: light' \
-    #   -H 'sec-ch-ua: "Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"' \
-    #   -H 'sec-ch-ua-full-version-list: "Chromium";v="152.0.7977.64", "Not?A_Brand";v="24.0.0.0", "Google Chrome";v="152.0.7977.64"' \
-    #   -H 'sec-ch-ua-mobile: ?0' \
-    #   -H 'sec-ch-ua-model: ""' \
-    #   -H 'sec-ch-ua-platform: "Linux"' \
-    #   -H 'sec-ch-ua-platform-version: ""' \
-    #   -H 'sec-fetch-dest: document' \
-    #   -H 'sec-fetch-mode: navigate' \
-    #   -H 'sec-fetch-site: same-origin' \
-    #   -H 'sec-fetch-user: ?1' \
-    #   -H 'upgrade-insecure-requests: 1' \
-    #   -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36' \
-    #   -H 'viewport-width: 1914'
 
 
 def _find_target_script(scripts):
@@ -96,39 +68,6 @@ def _find_target_script(scripts):
     for i, s in enumerate(scripts):
         if "display_uri" in s.text:
             return s
-
-
-# def _get_headers(*, refererer: str, **kwargs) -> dict[str, str]:
-#     # TODO, reduce same options, like referer
-#     headers = {
-#         "accept": "*/*",
-#         "accept-language": "nl-NL,nl;q=0.9",
-#         "cache-control": "no-cache",
-#         "content-type": "application/x-www-form-urlencoded",
-#         "origin": "https://www.instagram.com",
-#         "pragma": "no-cache",
-#         "priority": "u=1, i",
-#         "referer": refererer,
-#         "sec-ch-prefers-color-scheme": "light",
-#         "sec-ch-ua": '"Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"',
-#         "sec-ch-ua-full-version-list": '"Chromium";v="152.0.7977.64", "Not?A_Brand";v="24.0.0.0", "Google Chrome";v="152.0.7977.64"',
-#         "sec-ch-ua-mobile": "?0",
-#         "sec-ch-ua-model": '""',
-#         "sec-ch-ua-platform": '"Linux"',
-#         "sec-ch-ua-platform-version": '""',
-#         "sec-fetch-dest": "empty",
-#         "sec-fetch-mode": "cors",
-#         "sec-fetch-site": "same-origin",
-#         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
-#         "x-asbd-id": "359341",
-#         "x-csrftoken": "knYXW4LbCkbA8xh3I6bj-D",
-#         "x-fb-friendly-name": "PolarisLoggedOutDesktopWWWProfilePostsTabContentQuery_connection",
-#         "x-fb-lsd": "AdQGzW3iZZ7BFX8LN2qf8SvcUio",
-#         "x-ig-app-id": "936619743392459",
-#         "x-ig-max-touch-points": "10",
-#     }
-#     headers = dict(y for y in [tuple(x.split(": ", 1)) for x in headers] if len(y) == 2)
-#     return headers
 
 
 def _get_headers(**kwargs) -> dict[str, str]:
@@ -200,60 +139,13 @@ class InstaState:
             "server_timestamps": "true",
             "variables": {
                 "after": self.end_cursor,
-                "first": 30,
+                "first": 90,
                 "id": self.id,
             },
             "doc_id": "27389614800735091",
         }
         data_raw = parse.urlencode(data_raw_dict)
         return data_raw
-
-
-# @dataclasses.dataclass(frozen=True)
-# class InstaState(State):
-#     end_cursor: str
-#     has_next_page: bool
-#     id: str
-#     doc_id: str
-
-#     def get_data_raw(self):
-
-#         data_raw_dict = {
-#             "av": 0,
-#             "__d": "www",
-#             "__user": 0,
-#             "__a": 1,
-#             "__req": "o",
-#             "__hs": "20698.HYP%3Ainstagram_web_pkg.2.1...0",
-#             "dpr": 1,
-#             "__ccg": "EXCELLENT",
-#             "__rev": "1046611421",
-#             "__s": "cv7nzz%3Acqdfmc%3Aa5p711",
-#             "__hsi": 7680920097373117430,
-#             "__dyn": "7xeUjG1mxu1syaxG4Vp41twpUnwgU7SbzEdF8vyUco2qwJyE1kUhw2nVE4W0qa321Rw8G11wBz81s8hwGxu786a3a1YwBgao6C1uwoE2swlo8od8-U2zxe2GewGw9a361qw8Xxm16wa-0oa2-azo7u3C2u2J0bS1LyUaUbGxK3R08-269wr84-6o5p389oed6goK10xKi2K7E5y4U7a0EoKmUhw4rwXyEcFE461Hwj83KwRzk1jw",
-#             "__csr": "g9c5278YAW4Nal8I9hYYAlh4BsPmNsXtOiJj9WVCLXqCrlrqLtlOlA9syHrFSBl65BktjmGbRJvOiaJoyXYx4iCjyehQWAmJvY9T5_myZTUZmRUSgynFpdWAUCGoyiGQmDHBxi9ZxyiHX-8KfKdh9ESuKHxOqUjxy7E89pkrDK7pqx2dBCx64EOtau8BQi6AfAKunBByHQi2im4FXxqaCGl29oK5ouCynyoO2OHUjhEnwq64oy5E4V0KBG096oG0UE8o1jEng9U9kECEgDDwjbWK00zAE036swdK02gKcA8t010-bIE0hfw2L81BEG1KBg1YU4mzh0mglU1yE1-nwwEU4y6Ugw8R0Yy4kw5W1Ww2Wpo2jo0eJo0Zu014RCm10w2Zo42m0wo092o",
-#             "__hsdp": "giE5I4Iavn1t8y52kAyuVVlggucDiCzpojUwygBJ0MV16Et41GsqA2JyUiK7k1pwU83eQ0xO1TyA6oaUZio88iU6Kcw-w_xW0FQ78cUaUCm8wGwm87u0xU5e1gxG2e78K0MK5Q1lAw4Tw10q0P88ojw31o3fwTwmU0qnw9y1JwAw9y68K2qeho0L62O0gS8wqU1uVU0UK0qm0lG3m0ll3E8Q3h0hE96",
-#             "__hblp": "0i85W3y1AxW8x69h433wn8K2KdyVHz-m1oU8rh8iAz88o5610x-Vm6orByonwwghVUK4VQnwOz8fEfUuwsoCEa4dUO7olG2y9By8aE5y1MCBw-wgE5ecwgUqwzxObwbShwCz9U98Sim9xm0h60sa0A84W0K879od8bVE4u1dwioc80I20PUdU5K0fDw2v820wiE5Sfy8rxOm785y64ax658V5w8G09CwIw9W1Ky85e5U1uVU0UK0ME2cwlo5XwuE4S322qew-wio3cgW2d0Qg4q2hw",
-#             "__sjsp": "giE5I4Iarn6ggO8xgB9mqVVlggix-dBxfy292kh0UwiFNGgaUS4E06q2",
-#             "__comet_req": 7,
-#             "lsd": "AdQGzW3iZZ7BFX8LN2qf8SvcUio",
-#             "jazoest": "22273",
-#             "__spin_r": 1046611421,
-#             "__spin_b": "trunk",
-#             "__spin_t": 1788353570,
-#             "__crn": "comet.igweb.PolarisLoggedOutDesktopWWWProfileRoute",
-#             "fb_api_caller_class": "RelayModern",
-#             "fb_api_req_friendly_name": "PolarisLoggedOutDesktopWWWProfilePostsTabContentQuery_connection",
-#             "server_timestamps": "true",
-#             "variables": {
-#                 "after": self.end_cursor,
-#                 "first": 12,
-#                 "id": self.id,
-#             },
-#             "doc_id": self.doc_id,
-#         }
-#         data_raw = parse.urlencode(data_raw_dict)
-#         return data_raw
 
 
 def _insta_urls_from_initial_page(soup):
@@ -277,14 +169,6 @@ class InstaScraper(Scraper):
 
     def download_continuation(self, state):
 
-        # url = "https://www.instagram.com/api/graphql"
-
-        # data_raw = state.get_data_raw()
-        # headers = _get_headers(refererer=self.base_url)
-        # res = requests.post(url=url, cookies=None, headers=headers, allow_redirects=True, data=data_raw)
-        # print(res.content.decode("utf-8"))
-        # json_obj = res.json()
-        # return json_obj
         # TODO
         cookie = "csrftoken=knYXW4LbCkbA8xh3I6bj-D; datr=lSmDagjmqHEkJ2sAPpRNlC_N; ig_did=8B4D78DB-6FDC-4EF1-B49D-D6C255C6E7D4; mid=aoMplQAEAAFj9CdbeQW4NI0tmEZg; wd=1914x960"
         url = "https://www.instagram.com/api/graphql"
@@ -292,9 +176,14 @@ class InstaScraper(Scraper):
         data_raw = state.get_data_raw()
         headers = _get_headers()
         res = requests.post(url=url, cookies=None, headers=headers, allow_redirects=True, data=data_raw)
-
-        json_obj = json.loads(res.content)
-        return json_obj
+        _logger.debug("%s, %s", res.status_code, res.content)
+        # json_obj = json.loads(res.content)
+        try:
+            json_obj = res.json()
+            return json_obj
+        except json.JSONDecodeError as e:
+            _logger.error("%s", e.msg)
+            return None
 
     def download_page(self) -> str:
         url = self.base_url  # TODO
@@ -328,7 +217,7 @@ class InstaScraper(Scraper):
         print(id_)
         if id_ is None:
             return None
-        id_ = id_["id"]
+        id_ = id_.get("id")
         doc_id = ""
         assert isinstance(id_, str), f"{type(id_)} should be str"
         state = InstaState(
@@ -376,6 +265,18 @@ class InstagramFactory(Factory):
         )
 
     def post_process_url(self, url: str) -> str:
+        from urllib import parse
+
+        x = parse.urlparse(url=url, scheme="https")
+        scheme, netloc, path, params, query, fragment = x
+        new_netloc = "instagram.frtm1-3.fna.fbcdn.net"
+        q = parse.parse_qs(x.query)
+        q2 = {**q}
+        q2["stp"][0] = q2["stp"][0].replace("_s640x640", "")
+        q2["_nc_ht"][0] = "instagram.frtm1-3.fna"
+
+        new_query = parse.urlencode(q2)
+        new_url = parse.urlunparse([scheme, new_netloc, path, params, new_query, fragment])
         return url
 
     def keep_url(self, url: str) -> bool:

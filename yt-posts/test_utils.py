@@ -3,6 +3,7 @@ import unittest
 import unittest.mock
 from collections.abc import Generator
 
+from download_utils import _find_file_name
 from utils import (
     find_key_rec,
     find_key_rec_with_path,
@@ -24,7 +25,7 @@ class TestUtils(unittest.TestCase):
         self.assertIsNone(find_key_rec(a, "k"))
         self.assertEqual(find_key_rec(a, "a"), {"b": "c", "d": "e"})
 
-        self.assertRaises(AssertionError,lambda: find_key_rec(a, 0))
+        self.assertRaises(AssertionError, lambda: find_key_rec(a, 0))
 
     def test_print_iter_item(self):
 
@@ -60,3 +61,41 @@ class TestUtils(unittest.TestCase):
         result = list(result)
 
         self.assertListEqual(result, [1, 2, 3, 4, 5])
+
+
+class TestDownloadUtils(unittest.TestCase):
+    def test_find_file_name_empty(self):
+
+        url = ""
+        result = _find_file_name(url, default="not_found")
+        excepted = "not_found"
+        self.assertEqual(result, excepted)
+
+    def test_find_file_name_non_empty(self):
+
+        url = "https://www.example.com/test/foo/bar.png"
+        result = _find_file_name(url)
+        excepted = "bar.png"
+        self.assertEqual(result, excepted)
+
+    def test_find_file_name_trailing_slash(self):
+
+        url = "https://www.example.com/test/foo/baz/"
+        result = _find_file_name(url)
+        excepted = "baz"
+        self.assertEqual(result, excepted)
+
+    def test_find_file_name_empty_dir_slash(self):
+
+        url = "https://www.example.com/test/foo//"
+        result = _find_file_name(url)
+        excepted = "foo"
+        self.assertEqual(result, excepted)
+
+    def test_find_file_name_bytes(self):
+
+        url = b"https://www.example.com/test/foo/bar.png"
+
+        result = _find_file_name(url)
+        excepted = "bar.png"
+        self.assertEqual(result, excepted)
