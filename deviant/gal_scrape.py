@@ -1,16 +1,16 @@
 import argparse
 import logging
 import os
-import re
 from datetime import datetime, timezone
 
 import wget_utils
 
-DEFAULT_TIMEOUT = 3000
 _logger = logging.getLogger(__name__)
 
 
 def _validate_user_name(user_name):
+    import re
+
     user_regex = re.compile(r"^[a-z0-9\-]+$")
 
     if not user_regex.match(user_name):
@@ -33,16 +33,16 @@ def run_multi_page(user: str, start_amount: int, end_amount: int | None, wait: f
         url = f"https://www.deviantart.com/{user}/gallery?page={i}"
         target = os.path.join(user_dir, f"gallery_page_{i}.html")
         wget_utils.curl_download(url, target)
-        if i != start_amount:
+        if i != end_amount:
             wget_utils.pause_execution(wait)
 
 
 def run_single_page(users: list[str] | str, wait: float):
     if isinstance(users, str):
         users = [users]
-    for i, user in enumerate(users):
+    for i, user in enumerate(users, start=1):
         # on iterations after the first, run a delay
-        if i:
+        if i > 1:
             wget_utils.pause_execution(wait)
         print(user)
         user_url = "https://www.deviantart.com/{}/gallery?page=1".format(user)
@@ -148,33 +148,35 @@ def run_tag(tags, wait: float):
 
 
 def main():
-
+    logging.basicConfig(level="DEBUG")
     parser = argparse.ArgumentParser()
 
-    time_parser = argparse.ArgumentParser(add_help=False)
-    time_parser.add_argument("--wait", type=float, default=11, dest="wait")
-
     subparsers = parser.add_subparsers()
-    single_page_parser = subparsers.add_parser("single", parents=[time_parser])
+    single_page_parser = subparsers.add_parser("single")
+    single_page_parser.add_argument("--wait", type=float, default=11, dest="wait")
     single_page_parser.add_argument("users", type=_validate_user_name, nargs="+")
     single_page_parser.set_defaults(func=run_single_page)
 
-    single_user_parser = subparsers.add_parser("full", parents=[time_parser])
+    single_user_parser = subparsers.add_parser("full")
     single_user_parser.add_argument("user", type=_validate_user_name)
+    single_user_parser.add_argument("--wait", type=float, default=11, dest="wait")
     single_user_parser.set_defaults(func=run_single_user)
 
-    multi_page_parser = subparsers.add_parser("multi", parents=[time_parser])
+    multi_page_parser = subparsers.add_parser("multi")
     multi_page_parser.add_argument("user", type=_validate_user_name)
     multi_page_parser.add_argument("start_amount", type=int)
+    multi_page_parser.add_argument("--wait", type=float, default=11, dest="wait")
     multi_page_parser.add_argument("end_amount", type=int, nargs="?")
     multi_page_parser.set_defaults(func=run_multi_page)
 
-    daily_parser = subparsers.add_parser("daily", parents=[time_parser])
-    daily_parser.set_defaults(func=run_daily, wait=0.4)
+    daily_parser = subparsers.add_parser("daily")
+    daily_parser.add_argument("--wait", type=float, default=0.4, dest="wait")
+    daily_parser.set_defaults(func=run_daily)
 
-    tag_parser = subparsers.add_parser("tag", parents=[time_parser])
+    tag_parser = subparsers.add_parser("tag")
     tag_parser.add_argument("tags", type=str, nargs="+")
-    tag_parser.set_defaults(func=run_tag, wait=0.5)
+    tag_parser.add_argument("--wait", type=float, default=0.5, dest="wait")
+    tag_parser.set_defaults(func=run_tag)
 
     args = parser.parse_args()
     args = vars(args)

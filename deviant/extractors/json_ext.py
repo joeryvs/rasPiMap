@@ -5,6 +5,7 @@ import pathlib
 import sys
 from collections.abc import Iterable
 
+import esprima
 from bs4 import BeautifulSoup
 from utils import Extractor
 
@@ -25,6 +26,7 @@ class JsonExtractor(Extractor):
             if y.is_file()
         ]
         for name in input_path:
+            _logger.debug("Start parsing %s", name)
             if not name.exists():
                 _logger.error("ERROR %s file does not exist", name)
                 continue
@@ -35,16 +37,15 @@ class JsonExtractor(Extractor):
                 _logger.error("ERROR %s file has no _R_ script section", name)
                 continue
             text = script.text
-            lines = text.split("\n")
-            important: str = lines[3]
+            parsed_script = esprima.parseScript(text)
+
             # make a lot of assumption no of the structure
-            important = important.removeprefix("window.__INITIAL_STATE__ = JSON.parse(").removesuffix(");")
-            # kinda dangeroues to run arbartraty code,
-            important = eval(important, {}, {})
+            important = parsed_script.body[2].expression.right.arguments[0].value
+            new_important = important
             # parse to obj and back to string
             try:
-                # prettify the JSON
-                json_content = json.loads(important)
+                # prettify the JSON, by loading and dumping
+                json_content = json.loads(new_important)
                 output = json.dumps(
                     json_content,
                     check_circular=True,
@@ -55,6 +56,9 @@ class JsonExtractor(Extractor):
                 )
             except json.decoder.JSONDecodeError:
                 _logger.error("ERROR %s has an imparseble json content", name)
+                output = important
+            except TypeError as te:
+                _logger.error("ERROR %s has a TypeError %s", name, te)
                 output = important
             name = name.with_suffix(".json").name
             self.writer.output_content_to_directory(name, output)

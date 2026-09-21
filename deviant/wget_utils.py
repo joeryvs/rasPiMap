@@ -265,14 +265,14 @@ def update_write_time_of_file(filename: str, last_modified_date: str):
         os.utime(filename, times=times)
 
 
-def curl_download(url: str, output_file: str):
+def curl_download(url: str, output_file: str, *, timeout=DEFAULT_TIMEOUT):
     # download 1 file, and output it, simulating a single curl call
     _logger.debug("Download %s, saving to %s", url, output_file)
-    with requests.get(url=url, timeout=DEFAULT_TIMEOUT) as res, open(output_file, "wb") as f:
+    with requests.get(url=url, timeout=timeout) as res, open(output_file, "wb") as f:
         f.write(res.content)
 
 
-def download_file(url, out=None, *, update_write_time=True):
+def download_file(url, out=None, *, update_write_time=True, timeout=DEFAULT_TIMEOUT):
     """High level function, which downloads URL into tmp file in current
     directory and then renames it to filename autodetected from either URL
     or HTTP headers.
@@ -286,7 +286,7 @@ def download_file(url, out=None, *, update_write_time=True):
         outdir = out
         out = None
 
-    with requests.get(url=url, timeout=DEFAULT_TIMEOUT) as res:
+    with requests.get(url=url, timeout=timeout) as res:
         headers = res.headers
         filename = _detect_filename(url, out, headers)
         if outdir:
@@ -306,7 +306,13 @@ def download_file(url, out=None, *, update_write_time=True):
 
 
 def download_from_stream(
-    urls, directory_prefix: str, *, wait_time: float = 0, random_wait=False, update_write_time=True
+    urls,
+    directory_prefix: str,
+    *,
+    wait_time: float = 0,
+    random_wait=False,
+    update_write_time=True,
+    timeout=DEFAULT_TIMEOUT,
 ):
     """High level function, which downloads URLS from a stream, into directory
     renames it to filename autodetected from either URL or HTTP headers.
@@ -315,16 +321,17 @@ def download_from_stream(
     :param wait_time: amount of time to wait between requests
     :param random_wait: boolean flag to fluctuate wait time
     :param update_write_time: boolean flag to determine if the write_date should be updated
+    :param timeout: float to determine the maximum waiting period of the request
     :return:    status_code
     """
     status_code = 0
     rejected = []
     with requests.Session() as session:
         for i, url in enumerate(urls, start=1):
-            if i and wait_time >= 0:
+            if i > 1 and wait_time >= 0:
                 pause_execution(wait_time, random_wait)
             try:
-                with session.get(url=url, timeout=DEFAULT_TIMEOUT) as res:
+                with session.get(url=url, timeout=timeout) as res:
                     headers = res.headers
                     filename = _detect_filename(url, None, headers)
 
