@@ -22,6 +22,12 @@ def create_db(database) -> sqlite3.Connection:
         baseUri TEXT,
         prettyName TEXT,
         hasBlockReasons INTEGER,
+        canBeMultiMedia INTEGER,
+        isMultiMedia INTEGER,
+        isAiGenerated INTEGER,
+        isVideo INTEGER,
+        license TEXT,
+        filetype TEXT NOT NULL,
         shortUrl TEXT NOT NULL,
         url TEXT NOT NULL,
         pageTitle TEXT NOT NULL,
@@ -37,6 +43,7 @@ def create_db(database) -> sqlite3.Connection:
         """)
     cur.execute("""CREATE TABLE IF NOT EXISTS imageSize(
         entityID TEXT REFERENCES images (entityID) ON DELETE CASCADE NOT NULL,
+        publishedTime TEXT NOT NULL ON CONFLICT FAIL,
         WIDTH INTEGER NOT NULL CHECK (WIDTH >= 0),
         HEIGHT INTEGER NOT NULL CHECK (HEIGHT >= 0),
         TYPE TEXT NOT NULL,
@@ -116,8 +123,9 @@ def fill_with_json_data(db: sqlite3.Connection, directory_path, /, dry_run, max_
         if image_data:
             _ = cur.execute(
                 "INSERT INTO image "
-                "(entityID,publishedDate,media,baseUri,prettyName,hasBlockReasons,shortUrl,Url,PageTitle,title) "
-                "VALUES (:entity_id,:publish_date,:media,:base_uri,:pretty_name,:has_block_reasons,:short_url,:url,:page_title,:title) "
+                "(entityID  ,publishedDate,canbeMultiMedia ,isMultiMedia ,isAIgenerated ,isVideo ,license ,filetype ,media ,baseUri  ,prettyName  ,hasBlockReasons   ,shortUrl  ,Url ,PageTitle  ,title ) "
+                "VALUES "
+                "(:entity_id,:publish_date,:canbeMultiMedia,:isMultiMedia,:isAIgenerated,:isVideo,:license,:filetype,:media,:base_uri,:pretty_name,:has_block_reasons,:short_url,:url,:page_title,:title) "
                 "RETURNING entityId",
                 image_data,
             )
@@ -125,9 +133,9 @@ def fill_with_json_data(db: sqlite3.Connection, directory_path, /, dry_run, max_
         _ = cur.executemany("INSERT INTO token (entityId,token) VALUES (:entity_id,:token)", token_data)
 
         _ = cur.executemany(
-            "INSERT INTO imageSize (entityId,width,height,type,component,filename,radius)"
+            "INSERT INTO imageSize (entityId,publishedTime,width,height,type,component,filename,radius)"
             " VALUES "
-            "(:entity_id,:width,:height,:type,:component,:filename,:radius)",
+            "(:entity_id,:publish_date,:width,:height,:type,:component,:filename,:radius)",
             size_data,
         )
     if not dry_run:
@@ -180,7 +188,7 @@ def _get_file_name(c, pretty_name, base_uri):
         return pathlib.Path(base_uri).name
 
 
-def _create_image_size(id, x, pretty_name, base_uri):
+def _create_image_size(id, x, pretty_name, base_uri, publish_date):
     _logger.debug("imagesize data: %s", x)
     width = x["w"]
     height = x["h"]
@@ -188,7 +196,16 @@ def _create_image_size(id, x, pretty_name, base_uri):
     C: str = x.get("c") or x.get("b") or x.get("s") or ""
     F: str = _get_file_name(C, pretty_name, base_uri)
     R = x["r"]
-    yield {"entity_id": id, "width": width, "height": height, "type": type, "component": C, "filename": F, "radius": R}
+    yield {
+        "entity_id": id,
+        "width": width,
+        "height": height,
+        "type": type,
+        "component": C,
+        "filename": F,
+        "radius": R,
+        "publish_date": publish_date,
+    }
     if extra_sizes := x.get("ss", []):
         for x2 in extra_sizes:
             w2 = x2["w"]
@@ -196,7 +213,16 @@ def _create_image_size(id, x, pretty_name, base_uri):
             t2 = f"{type}-{x2['x']}x"
             c2 = x2.get("c") or x2.get("b") or x2.get("s") or ""
             f2 = _get_file_name(c2, pretty_name, base_uri)
-            yield {"entity_id": id, "width": w2, "height": h2, "type": t2, "component": c2, "filename": f2, "radius": R}
+            yield {
+                "entity_id": id,
+                "width": w2,
+                "height": h2,
+                "type": t2,
+                "component": c2,
+                "filename": f2,
+                "radius": R,
+                "publish_date": publish_date,
+            }
 
 
 def _extract_from_deviation_json(key, value):
@@ -207,6 +233,12 @@ def _extract_from_deviation_json(key, value):
     baseUri = value["media"].get("baseUri", "")
     prettyName = value["media"].get("prettyName", "")
     hasBlockReasons = len(value["blockReasons"]) > 0
+    isAIGenerated = value["isAiGenerated"]
+    can_be_multi_media = value.get("canBeMultiMedia", False)
+    isMultiMedia = value.get("isMultiMedia", False)
+    isVideo = value["isVideo"]
+    license = value["license"]
+    filetype = value.get("filetype", "")
     shortUrl = value["shortUrl"]
     url = value["url"]
     page_title = os.path.basename(url)
@@ -219,19 +251,28 @@ def _extract_from_deviation_json(key, value):
         "base_uri": baseUri,
         "pretty_name": prettyName,
         "has_block_reasons": hasBlockReasons,
+        "canbeMultiMedia": can_be_multi_media,
+        "isMultiMedia": isMultiMedia,
+        "isAIgenerated": isAIGenerated,
+        "isVideo": isVideo,
+        "filetype": filetype,
+        "license": license,
         "short_url": shortUrl,
         "url": url,
         "page_title": page_title,
         "title": title,
     }
     tokens = [{"entity_id": entityId, "token": token} for token in (value["media"].get("token", []))]
-    sizes = [y for x in value["media"].get("types", []) for y in _create_image_size(entityId, x, prettyName, baseUri)]
+    sizes = [
+        y
+        for x in value["media"].get("types", [])
+        for y in _create_image_size(entityId, x, prettyName, baseUri, publishDate)
+    ]
     yield item1, tokens, sizes
 
 
 def extract_items_from_json(obj):
-
-    deviations = obj["@@entities"]["deviation"]
+    deviations = obj["@@entities"].get("deviation", {})
 
     for k, v in deviations.items():
         yield from _extract_from_deviation_json(key=k, value=v)
@@ -243,16 +284,27 @@ def extract_items_from_json(obj):
                 media = record["media"]
                 prettyName = media["prettyName"]
                 baseUri = media["baseUri"]
+                publish_date = record["publishedDate"]
                 # I know the tokens are wrong but we care about the link to the publishdate which makes it acceptable
                 tokens = [{"entity_id": entity_id, "token": token} for token in (media.get("token", []))]
                 sizes = [
-                    y for x in media.get("types", []) for y in _create_image_size(entity_id, x, prettyName, baseUri)
+                    y for x in media.get("types", []) for y in _create_image_size(entity_id, x, prettyName, baseUri, publish_date)
                 ]
                 yield None, tokens, sizes
 
             related_content = v["relatedContent"]
             for item in related_content:
                 yield from _find_media_in_related_content(item)
+    # gallery exclusive strips
+    strips = obj.get("currentPageData", {}).get("strips", None)
+    if strips:
+        for strip in strips:
+            for ws in strip.get("watchSuggestions", []):
+                for d in ws["deviations"]:
+                    yield from _extract_from_deviation_json(key=d.get("entityId") or d.get("deviationId"), value=d)
+            for usersExtra in strip.get("usersExtra", []):
+                for d in usersExtra["deviations"]:
+                    yield from _extract_from_deviation_json(key=d.get("entityId") or d.get("deviationId"), value=d)
 
 
 def _find_media_in_related_content(item):
