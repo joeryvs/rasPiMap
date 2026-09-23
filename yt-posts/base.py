@@ -63,10 +63,7 @@ class Scraper[State](ABC):
             _logger.info("Iteration: %s, currentState: %s", index, state)
             json_obj = self.download_continuation(state)
             # save the JSON for later
-            if self.base_dir:
-                out_path = os.path.join(self.base_dir, f"out_{index}.json")
-                with open(out_path, "w") as f_out:
-                    json.dump(fp=f_out, obj=json_obj, indent=2)
+            self.save_json_in_base_dir(json_obj=json_obj, filename=f"out_{index}.json")
             yield json_obj
 
             state = self.find_next_state(json_obj, state)
@@ -85,6 +82,13 @@ class Scraper[State](ABC):
                     json_obj = json.load(fp=fp)
                     urls = self.urls_from_json(json_obj)
                     yield from urls
+
+    def save_json_in_base_dir(self, json_obj, filename: str):
+        """Method that saves the JSON into the base_dir(if provided)"""
+        if self.base_dir is not None:
+            out_path = os.path.join(self.base_dir, filename)
+            with open(out_path, "w") as f_out:
+                json.dump(fp=f_out, obj=json_obj, indent=2)
 
 
 class EagerScraper(Scraper):

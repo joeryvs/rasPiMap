@@ -121,6 +121,8 @@ class YtPostScraper[Y: YtState](Scraper):
             return None
         value = str(scripts[0].text.removesuffix(";").removeprefix("var ytInitialData = "))
         json_obj = json.loads(value)
+
+        self.save_json_in_base_dir(json_obj=json_obj, filename="html_provided_json.json")
         # Step 3 find and return the first continuationCommand
         # command = json_obj
         command = find_key_rec(json_obj, "continuationCommand")

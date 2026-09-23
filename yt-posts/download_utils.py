@@ -8,6 +8,7 @@ import urllib.parse
 from uuid import uuid4
 
 import requests
+from tqdm import tqdm
 
 _logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ def download_from_web(
     overwrite=True,
     update_extension=False,
     update_write_date=True,
+    timeout=10_000,
 ):
     if target_directory:
         os.makedirs(target_directory, exist_ok=True)
@@ -45,7 +47,7 @@ def download_from_web(
         # From the url perform an urlsplit to remove the query parameters, and finally split at / and take the last element
         p = _find_file_name(url=url)
         time.sleep(0.1)
-        with requests.get(url=url) as res:
+        with requests.get(url=url, stream=True, timeout=timeout) as res:
             new_file = pathlib.Path(os.path.join(target_directory, p))
             if update_extension and (new_extension := extensions.get(res.headers["content-type"])):
                 new_file = new_file.with_suffix(new_extension)
@@ -54,7 +56,7 @@ def download_from_web(
                 new_file = find_unused_filename(str(new_file))
             _logger.info("[%s] %s -> %s", i, url, new_file)
             with open(new_file, "wb") as f:
-                f.write(res.content)
+                f.writelines(tqdm(res.iter_content()))
             if update_write_date:
                 write_date = res.headers.get("Last-Modified")
                 if write_date:

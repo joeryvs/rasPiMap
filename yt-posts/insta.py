@@ -195,7 +195,17 @@ class InstaScraper(Scraper):
         return data
 
     def urls_from_initial(self, soup) -> list:
-        return _insta_urls_from_initial_page(soup=soup)
+        scripts = soup.find_all("script")
+        target_script = _find_target_script(scripts)
+        if target_script is None:
+            _logger.warning("No script found")
+            return []
+
+        json_obj = json.loads(target_script.text or "")
+
+        p = utils.find_keys_rec(json_obj, "display_uri", with_path=True)
+
+        return [z for _, z in p]
 
     def urls_from_json(self, j) -> list:
         urls = utils.find_keys_rec(j, "display_uri", False)
@@ -207,13 +217,16 @@ class InstaScraper(Scraper):
         if target_script is None:
             _logger.warning("No Valid script found")
             return None
-        x = json.loads(target_script.text)
-        page_info = utils.find_key_rec(x, "page_info")
+        json_obj = json.loads(target_script.text)
+        # save JSON for later
+        self.save_json_in_base_dir(json_obj=json_obj, filename="insta_html_json.json")
+
+        page_info = utils.find_key_rec(json_obj, "page_info")
         print(page_info)
         if not isinstance(page_info, dict):
             _logger.warning("page info is not a dict, is type %s , with value %s", type(page_info), str(page_info))
             return None
-        id_ = utils.find_key_rec(x, "xig_user_by_username")
+        id_ = utils.find_key_rec(json_obj, "xig_user_by_username")
         print(id_)
         if id_ is None:
             return None
