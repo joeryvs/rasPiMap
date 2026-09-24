@@ -162,9 +162,9 @@ def _insta_urls_from_initial_page(soup):
 
 
 class InstaScraper(Scraper):
-    def __init__(self, *, base_dir, wait_time, base_url, html_save_location: str | None = None) -> None:
+    def __init__(self, *, base_dir, wait_time, base_url) -> None:
         self.base_url = base_url
-        self.html_save_location = html_save_location
+
         super().__init__(base_dir=base_dir, wait_time=wait_time)
 
     def download_continuation(self, state):
@@ -187,11 +187,47 @@ class InstaScraper(Scraper):
 
     def download_page(self) -> str:
         url = self.base_url  # TODO
-        target = self.html_save_location or "insta_temp.html"
-        download_insta_page(url, target)
-
-        with open(target, "r") as f:
-            data = f.read()
+        headers = {
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept-language": "nl-NL,nl;q=0.9",
+            "cache-control": "no-cache",
+            "dpr": "1",
+            "pragma": "no-cache",
+            "priority": "u=0, i",
+            "referer": "https://duckduckgo.com/",
+            "sec-ch-prefers-color-scheme": "light",
+            "sec-ch-ua": '"Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"',
+            "sec-ch-ua-full-version-list": '"Chromium";v="152.0.7977.64", "Not?A_Brand";v="24.0.0.0", "Google Chrome";v="152.0.7977.64"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-model": '""',
+            "sec-ch-ua-platform": '"Linux"',
+            "sec-ch-ua-platform-version": '""',
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1",
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+            "viewport-width": "1914",
+        }
+        res = requests.get(
+            url=url,
+            timeout=30000,
+            data=None,
+            headers=headers,
+            json=None,
+            allow_redirects=True,
+            auth=None,
+            cert=None,
+            cookies=None,
+            files=None,
+            hooks=None,
+            params=None,
+            proxies=None,
+            stream=None,
+            verify=None,
+        )
+        data = res.content.decode("utf-8")
         return data
 
     def urls_from_initial(self, soup) -> list:
@@ -265,14 +301,13 @@ class InstagramFactory(Factory):
         self.user = user
         super().__init__()
         assert isinstance(self.user, str)
-        assert self.user.isalpha()
+        assert self.user
+        assert self.user.isprintable()
 
     def get_scraper(self, *, base_dir: str | None, wait_time: float) -> Scraper:
         base_url = f"https://www.instagram.com/{self.user}/"
-        html_save_location = f"{self.user}-front_page.html"
         return InstaScraper(
             base_url=base_url,
-            html_save_location=html_save_location,
             base_dir=base_dir,
             wait_time=wait_time,
         )
@@ -293,11 +328,11 @@ class InstagramFactory(Factory):
         return url
 
     def keep_url(self, url: str) -> bool:
-        return url.startswith("https")
+        return url is not None and url.startswith("https")
 
 
 def full_scrape_user(
-    user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_html: bool, save_temp_urls: bool, eager: bool
+    user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_temp_urls: bool, eager: bool
 ):
 
     _logger.debug("Scraping user %s", user)
@@ -312,13 +347,11 @@ def full_scrape_user(
         json_directory = None
 
     base_url = f"https://www.instagram.com/{user}/"
-    html_save = f"{user}-front_page.html" if save_html else None
-    scraper = InstaScraper(
-        base_url=base_url, wait_time=wait_time, base_dir=json_directory, html_save_location=html_save
-    )
+    scraper = InstaScraper(base_url=base_url, wait_time=wait_time, base_dir=json_directory)
     all_urls = scraper.run()
     if eager:
         all_urls = list(all_urls)
+
     if save_temp_urls:
         all_urls = print_iter_item(f"{user}-insta-full-temp-urls.txt", all_urls)
 
@@ -330,7 +363,7 @@ def full_scrape_user(
     if save_urls:
         urls = print_iter_item(input_file, urls)
     if eager:
-        urls = list(urls)
+        urls = list(url for url in urls if url)
     directory_prefix = f"{user}-full"
     download_from_web(urls, target_directory=directory_prefix, overwrite=True, update_extension=True)
 
@@ -346,7 +379,6 @@ def main():
     parser.add_argument("users", nargs="+")
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {VERSION}")
     parser.add_argument("--wait-time", type=float, default=4.0)
-    parser.add_argument("--save-html", action=BooleanOptionalAction, default=True)
     parser.add_argument("--save-json", action=BooleanOptionalAction, default=True)
     parser.add_argument("--save-urls", action=BooleanOptionalAction, default=True)
     parser.add_argument("--eager", action="store_true", dest="eager", default=True)
@@ -355,7 +387,6 @@ def main():
 
     users = args.users
     wait_time = args.wait_time
-    save_html = args.save_html
     save_json = args.save_json
     save_urls = args.save_urls
     eager = args.eager
@@ -364,7 +395,6 @@ def main():
             user,
             wait_time=wait_time,
             save_json=save_json,
-            save_html=save_html,
             save_temp_urls=save_urls,
             save_urls=save_urls,
             eager=eager,
