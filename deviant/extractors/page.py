@@ -1,6 +1,7 @@
 import logging
 import re
 from abc import ABC, abstractmethod
+from urllib import parse
 
 from utils import Extractor
 
@@ -16,7 +17,7 @@ class PageExtractor(Extractor, ABC):
 
         art_link_paths = map(self.post_proces_function, art_links)
         if unique:
-            _logger.info("TAking unique items")
+            _logger.info("Taking unique items")
             art_link_paths = list(dict.fromkeys(art_link_paths))
             _logger.info("new page links are: %d", len(art_link_paths))
         if sort:
@@ -57,14 +58,16 @@ class AllPagesExtractor(PageExtractor):
 
 class UserPageExtractor(PageExtractor):
     _name = "users"
+
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/gallery.*$")
 
 
 class ArtPageExtractor(PageExtractor):
     _name = "art"
+
     def extract_regex(self) -> re.Pattern:
         return re.compile(r"^.*/art/.+$")
 
     def post_proces_function(self, link: str) -> str:
-        return link.removesuffix("#comments")
+        return parse.urldefrag(link).url

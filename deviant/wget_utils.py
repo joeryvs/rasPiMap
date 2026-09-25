@@ -47,7 +47,7 @@ def pause_execution(seconds, random_wait: bool = False):
 def _filename_from_url(url: str) -> str | None:
     """:return: detected filename as str or None"""
     # [ ] test urlparse behavior with unicode url
-    fname = os.path.basename(urlparse.urlparse(url).path)
+    fname = os.path.basename(urlparse.urlparse(urlparse.unquote(url)).path)
     if len(fname.strip(" \n\t.")) == 0:
         return None
     return fname

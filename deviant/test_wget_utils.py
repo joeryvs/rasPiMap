@@ -7,18 +7,23 @@ from wget_utils import _detect_filename, _filename_fix_existing, _filename_from_
 
 class TestWget(TestCase):
     def test_filename_from_url_1(self):
-
-        url1 = "https://www.example.com/test.png?hello=world#container"
-        result1 = _filename_from_url(url1)
-
-        self.assertEqual(result1, "test.png")
+        """Test that fragment and query is removed"""
+        url = "https://www.example.com/test.png?hello=world#container"
+        result = _filename_from_url(url)
+        self.assertEqual(result, "test.png")
 
     def test_filename_from_url_2(self):
-
+        """Test that _filename_from_url return None by no argument"""
         url1 = "http://www.example.com/?hello=world#container"
         result1 = _filename_from_url(url1)
 
         self.assertIsNone(result1)
+
+    def test_filename_from_url_3(self):
+        """Test that the url is encoded"""
+        url = "http://www.example.com/foo/b%61r.txt"
+        result = _filename_from_url(url)
+        self.assertEqual(result, "bar.txt")
 
     def test_parse_last_modified_header_01(self):
 
