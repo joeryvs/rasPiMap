@@ -114,7 +114,7 @@ def run_daily(wait: float = 0.2):
     return 0
 
 
-def run_tag(tags, wait: float):
+def run_tag(tags, wait: float, wait_between: float):
 
     from extractors import JsonImagePreUrlExtractor
     from utils import FileWriter, Reader
@@ -142,7 +142,7 @@ def run_tag(tags, wait: float):
         extractor.extract(today_tag_index, sort=True, unique=True)
         wget_utils.download_from_file(today_tag_art_links, today_tag_map, wait_time=wait)
 
-        wget_utils.pause_execution(3)
+        wget_utils.pause_execution(wait_between)
 
     return 0
 
@@ -176,6 +176,7 @@ def main():
     tag_parser = subparsers.add_parser("tag")
     tag_parser.add_argument("tags", type=str, nargs="+")
     tag_parser.add_argument("--wait", type=float, default=0.5, dest="wait")
+    tag_parser.add_argument("--wait-between", type=float, default=7, dest="wait_between")
     tag_parser.set_defaults(func=run_tag)
 
     args = parser.parse_args()

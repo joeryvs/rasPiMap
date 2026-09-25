@@ -22,7 +22,7 @@ _logger = logging.getLogger(__name__)
 
 def wget_download(input_file: str, directory_prefix: str, wait_time: float):
     # Download the image with wget_utils function
-    wget_utils.download_from_file(input_file, directory_prefix, wait_time=wait_time, random_wait=True)
+    wget_utils.download_from_file(input_file, directory_prefix, wait_time=wait_time, random_wait=True,update_write_time=True)
 
 
 def run(

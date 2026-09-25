@@ -284,11 +284,13 @@ def extract_items_from_json(obj):
                 media = record["media"]
                 prettyName = media["prettyName"]
                 baseUri = media["baseUri"]
-                publish_date = record["publishedDate"]
+                publish_date = record.get("publishedDate", "")
                 # I know the tokens are wrong but we care about the link to the publishdate which makes it acceptable
                 tokens = [{"entity_id": entity_id, "token": token} for token in (media.get("token", []))]
                 sizes = [
-                    y for x in media.get("types", []) for y in _create_image_size(entity_id, x, prettyName, baseUri, publish_date)
+                    y
+                    for x in media.get("types", [])
+                    for y in _create_image_size(entity_id, x, prettyName, baseUri, publish_date)
                 ]
                 yield None, tokens, sizes
 

@@ -93,3 +93,6 @@ dev-proxy/devproxy/
 play/youtube
 deviant/*_desc/
 deviant/*_story
+
+*.archive
+*.cont
