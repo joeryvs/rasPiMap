@@ -22,7 +22,9 @@ _logger = logging.getLogger(__name__)
 
 def wget_download(input_file: str, directory_prefix: str, wait_time: float):
     # Download the image with wget_utils function
-    wget_utils.download_from_file(input_file, directory_prefix, wait_time=wait_time, random_wait=True,update_write_time=True)
+    wget_utils.download_from_file(
+        input_file, directory_prefix, wait_time=wait_time, random_wait=True, update_write_time=True
+    )
 
 
 def run(
@@ -141,9 +143,10 @@ def main():
         "--images-from-gallery",
         action=BooleanOptionalAction,
         default=True,
-        help="If set, dont download the pages, but download the previes images from the gallary directly",
+        help="If set, dont download the pages, but download the pre-images from the gallary directly",
     )
     parser.add_argument("--post-process", action=BooleanOptionalAction, default=False)
+    parser.add_argument("--log-level", dest="log_level", choices=logging._nameToLevel.keys(), default=None)
 
     parser.add_argument("--wait-pages", type=float, default=6.0)
     parser.add_argument("--wait-images", type=float, default=3.0)
@@ -151,6 +154,8 @@ def main():
 
     args = parser.parse_args()
 
+    if args.log_level:
+        logging.basicConfig(level=args.log_level)
     run(
         args.user,
         wait_pages=args.wait_pages,
