@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 from collections.abc import Callable
@@ -7,14 +6,13 @@ from base import Factory
 from download_utils import download_from_web
 from insta import InstagramFactory, InstaScraper, InstaState
 from utils import print_iter_item, unique
-from youtube import YtFactory, YtPostScraper
+from youtube import YoutubeCommunityFactory, YtFactory, YtPostScraper
 
 _logger = logging.getLogger(__name__)
-VERSION = "0.1"
+VERSION = "0.2"
 
 
 def full_scrape_user(
-    user: str,
     factory: Factory,
     *,
     wait_time: float,
@@ -25,10 +23,11 @@ def full_scrape_user(
     from_json: bool = False,
 ):
 
+    user = factory.get_user()
     _logger.debug("Scraping user %s with %s", user, factory.__class__)
 
     input_file = f"{user}-full-urls.txt"
-    json_directory = datetime.datetime.now(tz=datetime.timezone.utc).strftime("{}-%Y-%j").format(user)
+    json_directory = factory.get_json_directory()
     if os.path.isdir(json_directory):
         # Early return because the existence of the directory implies this user is already scraped
         _logger.warning("User %s has already been scraped today", user)
@@ -44,7 +43,6 @@ def full_scrape_user(
     if from_json and json_directory:
         all_urls = scraper.load_urls_from_files(json_directory=json_directory, html_location="")
     else:
-
         all_urls = scraper.run()
     if eager:
         all_urls = list(all_urls)
@@ -59,13 +57,14 @@ def full_scrape_user(
         urls = print_iter_item(input_file, urls)
     if eager:
         urls = list(urls)
-    directory_prefix = f"{user}-full"
+    directory_prefix = factory.image_directory()
     download_from_web(urls, target_directory=directory_prefix, overwrite=True, update_extension=True)
 
 
 FACTORIES: dict[str, Callable[[str], Factory]] = {
     "instagram": InstagramFactory,
     "youtube": YtFactory,
+    "youtube.community": YoutubeCommunityFactory,
 }
 
 
@@ -77,7 +76,7 @@ def main():
 
     parser.add_argument("users", nargs="+")
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {VERSION}")
-    parser.add_argument("--factory", choices=["instagram", "youtube"], default="youtube")
+    parser.add_argument("--factory", choices=["instagram", "youtube","youtube.community"], default="youtube")
     parser.add_argument("--wait-time", type=float, default=4.0)
 
     parser.add_argument("--save-json", action=argparse.BooleanOptionalAction, default=True)
@@ -102,7 +101,6 @@ def main():
     eager = args.eager
     for user in users:
         full_scrape_user(
-            user,
             factory(user),
             wait_time=wait_time,
             save_json=save_json,

@@ -330,6 +330,15 @@ class InstagramFactory(Factory):
     def keep_url(self, url: str) -> bool:
         return url is not None and url.startswith("https")
 
+    def get_user(self):
+        return self.user
+
+    def _json_directory_format_string(self) -> str:
+        return "{}-instagram-%Y-%j"
+
+    def image_directory(self) -> str:
+        return f"{self.user}-instagram-full"
+
 
 def full_scrape_user(
     user: str, wait_time: float, *, save_json: bool, save_urls: bool, save_temp_urls: bool, eager: bool

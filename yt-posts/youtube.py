@@ -213,3 +213,25 @@ class YtFactory(Factory):
 
     def keep_url(self, url: str) -> bool:
         return url.startswith("https://yt3.ggpht.com")
+
+    def get_user(self) -> str:
+        return self.user
+
+    def _json_directory_format_string(self) -> str:
+        return "{}-yt-posts-%Y-%j"
+
+    def image_directory(self) -> str:
+        return f"{self.user}-youtube-posts-full"
+
+
+class YoutubeCommunityFactory(YtFactory):
+    def get_scraper(self, *, base_dir: str | None, wait_time: float) -> Scraper:
+        graft_url = f"https://www.youtube.com/@{self.user}/community"
+
+        return YtPostScraper(base_dir=base_dir, wait_time=wait_time, graft_url=graft_url)
+
+    def _json_directory_format_string(self) -> str:
+        return "{}-yt-community-%Y-%j"
+
+    def image_directory(self) -> str:
+        return f"{self.user}-youtube-community-full"

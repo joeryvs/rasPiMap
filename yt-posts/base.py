@@ -1,4 +1,5 @@
 import collections.abc
+import datetime
 import json
 import logging
 import os
@@ -127,3 +128,18 @@ class Factory(ABC):
     def keep_url(self, url: str) -> bool:
         """Predicate to determine if the url should be kept"""
         return True
+
+    @abstractmethod
+    def get_user(self) -> str:
+        pass
+
+    def image_directory(self) -> str:
+        return f"{self.get_user()}-full"
+
+    @abstractmethod
+    def _json_directory_format_string(self) -> str:
+        return "{}-%Y-%j"
+
+    def get_json_directory(self):
+        format_string = self._json_directory_format_string()
+        return datetime.datetime.now(tz=datetime.timezone.utc).strftime(format_string).format(self.get_user())
