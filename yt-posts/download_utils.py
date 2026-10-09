@@ -56,7 +56,7 @@ def download_from_web(
                 new_file = find_unused_filename(str(new_file))
             _logger.info("[%s] %s -> %s", i, url, new_file)
             with open(new_file, "wb") as f:
-                f.writelines(tqdm(res.iter_content()))
+                f.writelines(tqdm(res.iter_content(chunk_size=None), leave=True, colour="green"))
             if update_write_date:
                 write_date = res.headers.get("Last-Modified")
                 if write_date:
