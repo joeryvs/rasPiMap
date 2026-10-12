@@ -2,10 +2,11 @@ import argparse
 import itertools
 import logging
 import os
+import re
 from collections.abc import Iterable
 from datetime import datetime, timezone
+from urllib import parse
 
-import utils
 import wget_utils
 from bs4 import BeautifulSoup
 from extractors import JsonImagePreUrlExtractor
@@ -16,21 +17,17 @@ _logger = logging.getLogger(__name__)
 
 
 def _validate_user_name(user_name):
-    import re
-
     user_regex = re.compile(r"^[a-z0-9\-]+$")
-
     if not user_regex.match(user_name):
         raise ValueError("name is not valid")
-
     return user_name
 
 
-def run_multi_page(user: str, start_amount: int, end_amount: int | None, wait: float):
+def run_multi_page(*, user: str, start_amount: int, end_amount: int | None, wait: float):
+    """Download a range of pages from a user"""
     # Validation
     if end_amount is None:
         start_amount, end_amount = 1, start_amount
-
     if wait < 0.0:
         raise ValueError("Wait time should be positive")
 
@@ -45,6 +42,7 @@ def run_multi_page(user: str, start_amount: int, end_amount: int | None, wait: f
 
 
 def run_single_page(users: list[str] | str, wait: float):
+    """Download the first page of the users"""
     if isinstance(users, str):
         users = [users]
     for i, user in enumerate(users, start=1):
@@ -58,7 +56,7 @@ def run_single_page(users: list[str] | str, wait: float):
 
 
 def run_single_user(user, wait: float):
-
+    """Download the full gallery of a single user"""
     assert isinstance(user, str)
     assert isinstance(wait, float)
 
@@ -66,8 +64,6 @@ def run_single_user(user, wait: float):
         raise ValueError("Wait time should be positive")
     user = _validate_user_name(user)
     from urllib import parse
-
-    from bs4 import BeautifulSoup
 
     user_dir = os.path.join(os.path.dirname(__file__), "gallery-pages", user)
     os.makedirs(user_dir, exist_ok=True)
@@ -95,7 +91,7 @@ def run_single_user(user, wait: float):
 
 
 def run_daily(wait: float = 0.2):
-
+    """Download all images currently on the front page, stops if the directory already exist"""
     today = datetime.now(tz=timezone.utc)
     today_map = format(today, "art-%Y-%j")
 
@@ -108,14 +104,12 @@ def run_daily(wait: float = 0.2):
         _logger.error("Directory already exists, ending call")
         return 1
 
-    os.makedirs(today_map, exist_ok=True)
+    os.makedirs(today_map, exist_ok=True)  # exist ok is used to avoid crashing
+    # Download home page,
     wget_utils.curl_download("https://www.deviantart.com/", today_index)
-    # call python script
-
-    # extractor = JsonImagePreUrlExtractor(reader=utils.Reader(), writer=utils.FileWriter(today_art_links))
-    # extractor.extract(today_index, sort=True, unique=True)
-    # wget_utils.download_from_file(today_art_links, today_map, wait_time=wait)
+    # extract urls
     image_urls = _json_pre_image_extractor(files=[today_index], write_target=today_art_links)
+    # download the urls
     wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_map, wait_time=wait)
     return 0
 
@@ -148,50 +142,43 @@ def run_tag(tags, wait: float, wait_between: float, max_downloads: int = 1, lazy
             lazy=lazy,
         )
 
-        # extractor = JsonImagePreUrlExtractor(reader=Reader(), writer=FileWriter(today_tag_art_links))
-        # # TODO update to lazy
-        # extractor.extract(files, sort=True, unique=True)
-        # wget_utils.download_from_file(today_tag_art_links, today_tag_map, wait_time=wait)
-
         image_urls = _json_pre_image_extractor(files=files, write_target=today_tag_art_links)
         wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_tag_map, wait_time=wait)
+        # pause execution for debugging and avoid rate-limitters
         wget_utils.pause_execution(wait_between)
 
     return 0
 
 
-def run_search(search_query: str, wait: float, max_downloads: int = 1, lazy: bool = False):
+def run_search(search_query: str, wait: float, wait_image: float, max_downloads: int = 1, lazy: bool = False):
+    """Run a search query and store the resulting images"""
     assert str.isprintable(search_query)
-    from urllib import parse
 
     query = parse.urlencode({"q": search_query})
-
     url = parse.urlunsplit(["https", "www.deviantart.com", "/search", query, ""])
-
-    today = format(datetime.now(tz=timezone.utc), "%Y-%j")
-
+    today = format(datetime.now(tz=timezone.utc), "%Y-%j")  # datestamp
+    # define variables for storing the HTML, image urls and images
     today_search_map = f"search/art-{search_query}-{today}"
     today_search_index = f"search/front-page/index-{search_query}-{today}.html"
     today_search_art_links = f"search/links/art-{search_query}-{today}.txt"
 
     print(url, today_search_map, today_search_index, today_search_art_links)
 
-    if os.path.isfile(today_search_map):
+    if os.path.isfile(today_search_map):  # dont allow downloading same search query on same day
         _logger.warning("Search %s is already downloaded", search_query)
         return
 
-    os.makedirs(today_search_map)
+    os.makedirs(today_search_map, exist_ok=True)
     files = _download_next_loop(
         initial_url=url,
         initial_location=today_search_index,
         location_url=lambda i: f"search/front-page/art-{search_query}-{today}-{i}.html",
         max_downloads=max_downloads,
-        wait=2,
+        wait=wait,
         lazy=lazy,
     )
-
     image_urls = _json_pre_image_extractor(files=files, write_target=today_search_art_links)
-    wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_search_map, wait_time=wait)
+    wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_search_map, wait_time=wait_image)
 
 
 def _download_next_loop(
@@ -203,6 +190,8 @@ def _download_next_loop(
     wait: float,
     lazy: bool = True,
 ) -> Iterable[str]:
+    """Download the pages, and continuosly go to the Next pages"""
+
     def foo():
 
         current_url = initial_url
@@ -234,9 +223,11 @@ def _download_next_loop(
 
 
 def _json_pre_image_extractor(files: Iterable[str], write_target):
+    """lazyly extract the image urls from JSON of the site, and save the urls in a file"""
+
     def write_to_file(items):
         if write_target:
-            with open(write_target) as f:
+            with open(write_target, "w") as f:
                 for item in items:
                     print(item, file=f)
                     yield item
@@ -244,12 +235,8 @@ def _json_pre_image_extractor(files: Iterable[str], write_target):
             yield from items
 
     extractor = JsonImagePreUrlExtractor(reader=Reader(), writer=FileWriter(write_target))
-    # TODO update to lazy
     links = extractor.retrieve(input_path=files)
-
-    # remove duplicates
-    links = unique_everseen(links)
-
+    links = unique_everseen(links)  # remove duplicates
     yield from write_to_file(links)
 
 
@@ -258,28 +245,28 @@ def main():
     parser = argparse.ArgumentParser()
 
     subparsers = parser.add_subparsers()
-    single_page_parser = subparsers.add_parser("single")
+    single_page_parser = subparsers.add_parser("single", help="download the first page of user(s)")
     single_page_parser.add_argument("--wait", type=float, default=11, dest="wait")
     single_page_parser.add_argument("users", type=_validate_user_name, nargs="+")
     single_page_parser.set_defaults(func=run_single_page)
 
-    single_user_parser = subparsers.add_parser("full")
+    single_user_parser = subparsers.add_parser("full", help="Fully scrape the gallery of a user")
     single_user_parser.add_argument("user", type=_validate_user_name)
     single_user_parser.add_argument("--wait", type=float, default=11, dest="wait")
     single_user_parser.set_defaults(func=run_single_user)
 
-    multi_page_parser = subparsers.add_parser("multi")
+    multi_page_parser = subparsers.add_parser("multi", help="Scrape the range of gallery pages of a user")
     multi_page_parser.add_argument("user", type=_validate_user_name)
     multi_page_parser.add_argument("start_amount", type=int)
     multi_page_parser.add_argument("--wait", type=float, default=11, dest="wait")
     multi_page_parser.add_argument("end_amount", type=int, nargs="?")
     multi_page_parser.set_defaults(func=run_multi_page)
 
-    daily_parser = subparsers.add_parser("daily")
+    daily_parser = subparsers.add_parser("daily", help="Scrape the front page")
     daily_parser.add_argument("--wait", type=float, default=0.4, dest="wait")
     daily_parser.set_defaults(func=run_daily)
 
-    tag_parser = subparsers.add_parser("tag")
+    tag_parser = subparsers.add_parser("tag", help="Scrape a tag page")
     tag_parser.add_argument("tags", type=str, nargs="+")
     tag_parser.add_argument("--wait", type=float, default=0.5, dest="wait")
     tag_parser.add_argument("--wait-between", type=float, default=7, dest="wait_between")
@@ -288,9 +275,10 @@ def main():
     tag_parser.add_argument("--eager", action="store_false", dest="lazy")
     tag_parser.set_defaults(func=run_tag)
 
-    search_parser = subparsers.add_parser("search")
+    search_parser = subparsers.add_parser("search", help="Perform a search scrape")
     search_parser.add_argument("search_query", type=str)
-    search_parser.add_argument("--wait", type=float, default=0.5, dest="wait")
+    search_parser.add_argument("--wait", type=float, default=7, dest="wait")
+    search_parser.add_argument("--wait-image", type=float, default=0.5)
     search_parser.add_argument("--max-downloads", type=int, default=1)
     search_parser.add_argument("--lazy", action="store_true", dest="lazy")
     search_parser.add_argument("--eager", action="store_false", dest="lazy")
