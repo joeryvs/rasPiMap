@@ -8,6 +8,7 @@ from database import create_db, fill_with_json_data, update_file_times
 from extractors import (
     ArtPageExtractor,
     DescriptionExtractor,
+    JsonAdditionalMediaExtractor,
     JsonExtractor,
     JsonImagePreUrlExtractor,
     MainImageExtractor,
@@ -100,7 +101,9 @@ def run(
     dir_story = f"{user}_story"
     dir_json = f"{user}_json"
     dir_main = f"{user}_main"
+    dir_additional = f"{user}_add"
     main_image = f"{user}_main_image.txt"
+    additional_image = f"{user}_additional_media.txt"
     if not skip_image_download:
         # find image links
         if not os.path.isfile(main_image):
@@ -111,12 +114,14 @@ def run(
         # output description/story/json description
         DescriptionExtractor(reader=reader, writer=FileWriter(dir_desc)).extract(input_path=art_pages)
         JsonExtractor(reader=reader, writer=FileWriter(dir_json)).extract(input_path=art_pages)
+        JsonAdditionalMediaExtractor(reader=reader, writer=FileWriter(additional_image)).extract(input_path=art_pages)
         StoryExtractor(reader=reader, writer=FileWriter(dir_story)).extract(input_path=art_pages)
         TagPageExtractor(reader=reader, writer=FileWriter(f"{user}_tag.txt")).extract(input_path=art_pages)
         ArtPageExtractor(reader=reader, writer=FileWriter(f"{user}_outgoing_art.txt")).extract(input_path=art_pages)
         # Download the image with wget
 
         wget_download(input_file=main_image, directory_prefix=dir_main, wait_time=wait_images)
+        wget_download(input_file=additional_image, directory_prefix=dir_additional, wait_time=wait_images)
 
     user_db = f"{user}.sqlite"
     if post_process:
@@ -124,7 +129,7 @@ def run(
 
         fill_with_json_data(db, dir_json, dry_run=False, max_depth=1)
         # update the time stamps on story/description/json and image
-        for p in [dir_desc, dir_story, dir_main, dir_json]:
+        for p in [dir_desc, dir_story, dir_main, dir_additional, dir_json]:
             if os.path.isdir(p):
                 update_file_times(db, p, dry_run=False)
 

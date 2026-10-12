@@ -1,9 +1,16 @@
 import argparse
+import itertools
 import logging
 import os
+from collections.abc import Iterable
 from datetime import datetime, timezone
 
+import utils
 import wget_utils
+from bs4 import BeautifulSoup
+from extractors import JsonImagePreUrlExtractor
+from more_itertools import unique_everseen
+from utils import FileWriter, Reader
 
 _logger = logging.getLogger(__name__)
 
@@ -104,20 +111,16 @@ def run_daily(wait: float = 0.2):
     os.makedirs(today_map, exist_ok=True)
     wget_utils.curl_download("https://www.deviantart.com/", today_index)
     # call python script
-    import utils
-    from extractors import JsonImagePreUrlExtractor
 
-    extractor = JsonImagePreUrlExtractor(reader=utils.Reader(), writer=utils.FileWriter(today_art_links))
-
-    extractor.extract(today_index, sort=True, unique=True)
-    wget_utils.download_from_file(today_art_links, today_map, wait_time=wait)
+    # extractor = JsonImagePreUrlExtractor(reader=utils.Reader(), writer=utils.FileWriter(today_art_links))
+    # extractor.extract(today_index, sort=True, unique=True)
+    # wget_utils.download_from_file(today_art_links, today_map, wait_time=wait)
+    image_urls = _json_pre_image_extractor(files=[today_index], write_target=today_art_links)
+    wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_map, wait_time=wait)
     return 0
 
 
-def run_tag(tags, wait: float, wait_between: float):
-
-    from extractors import JsonImagePreUrlExtractor
-    from utils import FileWriter, Reader
+def run_tag(tags, wait: float, wait_between: float, max_downloads: int = 1, lazy: bool = True):
 
     today = format(datetime.now(tz=timezone.utc), "%Y-%j")
     for tag in tags:
@@ -136,15 +139,118 @@ def run_tag(tags, wait: float, wait_between: float):
             continue
 
         os.makedirs(today_tag_map)
-        wget_utils.curl_download(url=url, output_file=today_tag_index)
+        files = _download_next_loop(
+            initial_url=url,
+            initial_location=today_tag_index,
+            location_url=lambda i: f"tag/front-page/index-{tag}-{today}-{i}.html",
+            max_downloads=max_downloads,
+            wait=wait_between,
+            lazy=lazy,
+        )
 
-        extractor = JsonImagePreUrlExtractor(reader=Reader(), writer=FileWriter(today_tag_art_links))
-        extractor.extract(today_tag_index, sort=True, unique=True)
-        wget_utils.download_from_file(today_tag_art_links, today_tag_map, wait_time=wait)
+        # extractor = JsonImagePreUrlExtractor(reader=Reader(), writer=FileWriter(today_tag_art_links))
+        # # TODO update to lazy
+        # extractor.extract(files, sort=True, unique=True)
+        # wget_utils.download_from_file(today_tag_art_links, today_tag_map, wait_time=wait)
 
+        image_urls = _json_pre_image_extractor(files=files, write_target=today_tag_art_links)
+        wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_tag_map, wait_time=wait)
         wget_utils.pause_execution(wait_between)
 
     return 0
+
+
+def run_search(search_query: str, wait: float, max_downloads: int = 1, lazy: bool = False):
+    assert str.isprintable(search_query)
+    from urllib import parse
+
+    query = parse.urlencode({"q": search_query})
+
+    url = parse.urlunsplit(["https", "www.deviantart.com", "/search", query, ""])
+
+    today = format(datetime.now(tz=timezone.utc), "%Y-%j")
+
+    today_search_map = f"search/art-{search_query}-{today}"
+    today_search_index = f"search/front-page/index-{search_query}-{today}.html"
+    today_search_art_links = f"search/links/art-{search_query}-{today}.txt"
+
+    print(url, today_search_map, today_search_index, today_search_art_links)
+
+    if os.path.isfile(today_search_map):
+        _logger.warning("Search %s is already downloaded", search_query)
+        return
+
+    os.makedirs(today_search_map)
+    files = _download_next_loop(
+        initial_url=url,
+        initial_location=today_search_index,
+        location_url=lambda i: f"search/front-page/art-{search_query}-{today}-{i}.html",
+        max_downloads=max_downloads,
+        wait=2,
+        lazy=lazy,
+    )
+
+    image_urls = _json_pre_image_extractor(files=files, write_target=today_search_art_links)
+    wget_utils.download_from_stream(urls=image_urls, directory_prefix=today_search_map, wait_time=wait)
+
+
+def _download_next_loop(
+    initial_url,
+    initial_location,
+    location_url,
+    *,
+    max_downloads: int | None = None,
+    wait: float,
+    lazy: bool = True,
+) -> Iterable[str]:
+    def foo():
+
+        current_url = initial_url
+        current_location = initial_location
+        iterator = range(1, max_downloads + 1) if isinstance(max_downloads, int) else itertools.count(start=1)
+        for iteration in iterator:
+            wget_utils.curl_download(url=current_url, output_file=current_location)
+            yield current_location
+
+            with open(current_location, "r") as f:
+                soup = BeautifulSoup(f.read(), features="html.parser")
+
+            # find the next one, 1) using the string param doesnt work correctly, 2) replace == with ordinal compare
+            next_anchors = [
+                anchor for anchor in soup.find_all("a") if anchor.text == "Next" and hasattr(anchor, "href")
+            ]
+            if not next_anchors:
+                break
+            else:
+                current_url = next_anchors[0]["href"]
+                # current_location = format(iteration, format_spec)
+                current_location = location_url(iteration)
+                wget_utils.pause_execution(seconds=wait)
+
+    if lazy:
+        return foo()
+    else:
+        return list(foo())
+
+
+def _json_pre_image_extractor(files: Iterable[str], write_target):
+    def write_to_file(items):
+        if write_target:
+            with open(write_target) as f:
+                for item in items:
+                    print(item, file=f)
+                    yield item
+        else:
+            yield from items
+
+    extractor = JsonImagePreUrlExtractor(reader=Reader(), writer=FileWriter(write_target))
+    # TODO update to lazy
+    links = extractor.retrieve(input_path=files)
+
+    # remove duplicates
+    links = unique_everseen(links)
+
+    yield from write_to_file(links)
 
 
 def main():
@@ -177,7 +283,18 @@ def main():
     tag_parser.add_argument("tags", type=str, nargs="+")
     tag_parser.add_argument("--wait", type=float, default=0.5, dest="wait")
     tag_parser.add_argument("--wait-between", type=float, default=7, dest="wait_between")
+    tag_parser.add_argument("--max-downloads", type=int, default=1, dest="max_downloads")
+    tag_parser.add_argument("--lazy", action="store_true", dest="lazy")
+    tag_parser.add_argument("--eager", action="store_false", dest="lazy")
     tag_parser.set_defaults(func=run_tag)
+
+    search_parser = subparsers.add_parser("search")
+    search_parser.add_argument("search_query", type=str)
+    search_parser.add_argument("--wait", type=float, default=0.5, dest="wait")
+    search_parser.add_argument("--max-downloads", type=int, default=1)
+    search_parser.add_argument("--lazy", action="store_true", dest="lazy")
+    search_parser.add_argument("--eager", action="store_false", dest="lazy")
+    search_parser.set_defaults(func=run_search)
 
     args = parser.parse_args()
     args = vars(args)
